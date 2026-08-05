@@ -14,7 +14,7 @@ interface SourceFormProps {
 
 export default function SourceForm({ personId, personName, onSuccess }: SourceFormProps) {
   const [form, setForm] = useState<SourceFormData>({
-    person_id: personId,
+    panson: personId,
     name: '',
     capt_number: '',
     shelf_number: '',
@@ -54,7 +54,7 @@ export default function SourceForm({ personId, personName, onSuccess }: SourceFo
       triggerRefresh();
       onSuccess?.();
       setForm({
-        person_id: personId,
+        panson: personId,
         name: '',
         capt_number: '',
         shelf_number: '',

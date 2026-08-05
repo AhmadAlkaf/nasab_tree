@@ -15,14 +15,14 @@ interface WifeFormProps {
 
 export default function WifeForm({ personId, personName, onSuccess }: WifeFormProps) {
   const [form, setForm] = useState<WifeFormData>({
-    person_id: personId,
-    the_wife_id: null,
+    person: personId,
+    the_wife: null,
     number: null,
     name: '',
     birth_year: null,
     death_year: null,
-    birth_place_id: null,
-    death_place_id: null,
+    birth_place: null,
+    death_place: null,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -53,14 +53,14 @@ export default function WifeForm({ personId, personName, onSuccess }: WifeFormPr
       triggerRefresh();
       onSuccess?.();
       setForm({
-        person_id: personId,
-        the_wife_id: null,
+        person: personId,
+        the_wife: null,
         number: null,
         name: '',
         birth_year: null,
         death_year: null,
-        birth_place_id: null,
-        death_place_id: null,
+        birth_place: null,
+        death_place: null,
       });
     } else {
       addToast({ type: 'error', message: result.error || 'حدث خطأ' });
@@ -135,13 +135,13 @@ export default function WifeForm({ personId, personName, onSuccess }: WifeFormPr
       <div className="form-row">
         <CitySelector
           label="مكان الميلاد"
-          value={form.birth_place_id}
-          onChange={(id) => updateField('birth_place_id', id)}
+          value={form.birth_place}
+          onChange={(id) => updateField('birth_place', id)}
         />
         <CitySelector
           label="مكان الوفاة"
-          value={form.death_place_id}
-          onChange={(id) => updateField('death_place_id', id)}
+          value={form.death_place}
+          onChange={(id) => updateField('death_place', id)}
         />
       </div>
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { searchPersons } from '@/lib/api';
+import { searchPersons, getPerson } from '@/lib/api';
 import { Person, Gender, GenderLabels, SearchResult } from '@/types';
 import { Search, X, User } from 'lucide-react';
 
@@ -85,14 +85,11 @@ export default function ParentSelector({
     setResults([]);
   };
 
-  // Load selected person name if value is set but person not loaded
   useEffect(() => {
     if (value && !selectedPerson) {
-      searchPersons('').then(res => {
-        // Simple lookup from mock data
+      getPerson(value).then(res => {
         if (res.success && res.data) {
-          const found = res.data.find(r => r.person.id === value);
-          if (found) setSelectedPerson(found.person);
+          setSelectedPerson(res.data);
         }
       });
     }

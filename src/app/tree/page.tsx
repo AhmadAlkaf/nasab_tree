@@ -1,20 +1,22 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Person } from '@/types';
 import { getPersonTree } from '@/lib/api';
 import FamilyTree from '@/components/tree/FamilyTree';
 
-export default function TreePage() {
+function TreeContent() {
   const [persons, setPersons] = useState<Person[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const rootId = searchParams.get('root') ? parseInt(searchParams.get('root')!, 10) : undefined;
 
   useEffect(() => {
     const fetchTree = async () => {
       setIsLoading(true);
-      const res = await getPersonTree();
+      const res = await getPersonTree(rootId);
       if (res.success && res.data) {
         setPersons(res.data);
       }
@@ -22,7 +24,7 @@ export default function TreePage() {
     };
     
     fetchTree();
-  }, []);
+  }, [rootId]);
 
   const handleNodeClick = (personId: number) => {
     router.push(`/persons/${personId}`);
@@ -53,5 +55,18 @@ export default function TreePage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function TreePage() {
+  return (
+    <Suspense fallback={
+      <div className="loading-overlay" style={{ height: 'calc(100vh - 48px)' }}>
+        <div className="loading-spinner lg" />
+        <span>جاري تحميل الصفحة...</span>
+      </div>
+    }>
+      <TreeContent />
+    </Suspense>
   );
 }

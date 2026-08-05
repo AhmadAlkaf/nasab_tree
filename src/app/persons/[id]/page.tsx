@@ -3,7 +3,7 @@
 import { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { Person, Wife, Source, GenderLabels, TypePersonLabels, TypeMotherLabels } from '@/types';
-import { getPerson, getWivesByPerson, getSourcesByPerson, deletePerson } from '@/lib/api';
+import { getPerson, deletePerson } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
 import MiniTree from '@/components/tree/MiniTree';
 import Modal from '@/components/ui/Modal';
@@ -34,21 +34,16 @@ export default function PersonDetailsPage({ params }: { params: Promise<{ id: st
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
-      const [personRes, wivesRes, sourcesRes] = await Promise.all([
-        getPerson(personId),
-        getWivesByPerson(personId),
-        getSourcesByPerson(personId)
-      ]);
+      const personRes = await getPerson(personId);
       
       if (personRes.success && personRes.data) {
         setPerson(personRes.data);
+        setWives(personRes.data.wives || []);
+        setSources(personRes.data.sources || []);
       } else {
         addToast({ type: 'error', message: 'لم يتم العثور على الشخص' });
         router.push('/persons');
       }
-      
-      if (wivesRes.success && wivesRes.data) setWives(wivesRes.data);
-      if (sourcesRes.success && sourcesRes.data) setSources(sourcesRes.data);
       
       setIsLoading(false);
     };

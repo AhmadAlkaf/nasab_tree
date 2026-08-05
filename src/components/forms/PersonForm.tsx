@@ -38,14 +38,14 @@ const defaultFormData: PersonFormData = {
   kunya: '',
   title: '',
   gender: 'M',
-  parent_id: null,
+  parent: null,
   type_person: TypePerson.included_extinct_females_only,
   birth_year: null,
   death_year: null,
   number: null,
-  birth_place_id: null,
-  death_place_id: null,
-  mother_id: null,
+  birth_place: null,
+  death_place: null,
+  mother: null,
   type_mother: TypeMother.alawi,
   number_mother: null,
   name_mother: '',
@@ -67,14 +67,14 @@ export default function PersonForm({ person, onSuccess, defaultParentId }: Perso
         kunya: person.kunya,
         title: person.title,
         gender: person.gender,
-        parent_id: person.parent_id,
+        parent: person.parent_id,
         type_person: person.type_person,
         birth_year: person.birth_year,
         death_year: person.death_year,
         number: person.number,
-        birth_place_id: person.birth_place_id,
-        death_place_id: person.death_place_id,
-        mother_id: person.mother_id,
+        birth_place: person.birth_place_id,
+        death_place: person.death_place_id,
+        mother: person.mother_id,
         type_mother: person.type_mother,
         number_mother: person.number_mother,
         name_mother: person.name_mother,
@@ -82,7 +82,7 @@ export default function PersonForm({ person, onSuccess, defaultParentId }: Perso
         file: null,
       });
     } else if (defaultParentId) {
-      setForm(prev => ({ ...prev, parent_id: defaultParentId }));
+      setForm(prev => ({ ...prev, parent: defaultParentId }));
     }
   }, [person, defaultParentId]);
 
@@ -133,7 +133,7 @@ export default function PersonForm({ person, onSuccess, defaultParentId }: Perso
         triggerRefresh();
         onSuccess?.(result.data);
         if (!isEditing) {
-          setForm({ ...defaultFormData, parent_id: defaultParentId || null });
+          setForm({ ...defaultFormData, parent: defaultParentId || null });
         }
       } else {
         addToast({
@@ -279,8 +279,8 @@ export default function PersonForm({ person, onSuccess, defaultParentId }: Perso
         
         <ParentSelector
           label="الأب"
-          value={form.parent_id}
-          onChange={(id) => updateField('parent_id', id)}
+          value={form.parent}
+          onChange={(id) => updateField('parent', id)}
           genderFilter="M"
           excludeId={person?.id}
           placeholder="ابحث عن الأب..."
@@ -289,8 +289,8 @@ export default function PersonForm({ person, onSuccess, defaultParentId }: Perso
 
         <ParentSelector
           label="الأم"
-          value={form.mother_id}
-          onChange={(id) => updateField('mother_id', id)}
+          value={form.mother}
+          onChange={(id) => updateField('mother', id)}
           genderFilter="F"
           excludeId={person?.id}
           placeholder="ابحث عن الأم..."
@@ -358,13 +358,13 @@ export default function PersonForm({ person, onSuccess, defaultParentId }: Perso
         <div className="form-row">
           <CitySelector
             label="مكان الميلاد"
-            value={form.birth_place_id}
-            onChange={(id) => updateField('birth_place_id', id)}
+            value={form.birth_place}
+            onChange={(id) => updateField('birth_place', id)}
           />
           <CitySelector
             label="مكان الوفاة"
-            value={form.death_place_id}
-            onChange={(id) => updateField('death_place_id', id)}
+            value={form.death_place}
+            onChange={(id) => updateField('death_place', id)}
           />
         </div>
       </div>
