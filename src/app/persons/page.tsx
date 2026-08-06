@@ -7,11 +7,14 @@ import { Person, SearchResult, GenderLabels, TypePersonLabels } from '@/types';
 import { getPersons, searchPersons } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
 import { Search, UserPlus, ChevronLeft, User } from 'lucide-react';
+import { truncateLineageName } from '@/lib/utils';
 
 export default function PersonsPage() {
   const [persons, setPersons] = useState<Person[]>([]);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [query, setQuery] = useState('');
+  const [filterGender, setFilterGender] = useState<string>('');
+  const [filterType, setFilterType] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const { refreshKey } = useAppStore();
   const router = useRouter();
@@ -53,6 +56,12 @@ export default function PersonsPage() {
     router.push(`/persons/${id}`);
   };
 
+  const displayedPersons = (query ? searchResults.map(r => r.person) : persons).filter(person => {
+    if (filterGender && person.gender !== filterGender) return false;
+    if (filterType && person.type_person.toString() !== filterType) return false;
+    return true;
+  });
+
   return (
     <div>
       <div className="page-header">
@@ -80,6 +89,27 @@ export default function PersonsPage() {
               onChange={(e) => setQuery(e.target.value)}
             />
           </div>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <select
+              className="form-select"
+              value={filterGender}
+              onChange={(e) => setFilterGender(e.target.value)}
+            >
+              <option value="">كل الأجناس</option>
+              <option value="M">ذكر</option>
+              <option value="F">أنثى</option>
+            </select>
+            <select
+              className="form-select"
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+            >
+              <option value="">كل الأنواع</option>
+              {Object.entries(TypePersonLabels).map(([key, label]) => (
+                <option key={key} value={key}>{label}</option>
+              ))}
+            </select>
+          </div>
         </div>
         
         <div className="table-wrapper">
@@ -102,20 +132,14 @@ export default function PersonsPage() {
                     <div className="loading-spinner" />
                   </td>
                 </tr>
-              ) : query && searchResults.length === 0 ? (
+              ) : displayedPersons.length === 0 ? (
                 <tr>
                   <td colSpan={7} style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}>
-                    لا توجد نتائج مطابقة للبحث
-                  </td>
-                </tr>
-              ) : !query && persons.length === 0 ? (
-                <tr>
-                  <td colSpan={7} style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}>
-                    لا يوجد أشخاص مسجلين بعد
+                    لا توجد نتائج مطابقة للبحث أو الفلتر
                   </td>
                 </tr>
               ) : (
-                (query ? searchResults.map(r => r.person) : persons).map((person) => (
+                displayedPersons.map((person) => (
                   <tr 
                     key={person.id} 
                     onClick={() => handleRowClick(person.id)}
@@ -133,7 +157,9 @@ export default function PersonsPage() {
                         >
                           <User size={16} />
                         </div>
-                        <span className="table-name">{person.name}</span>
+                        <span className="table-name">
+                          {truncateLineageName(person.lineage_name || person.name)}
+                        </span>
                       </div>
                     </td>
                     <td>{person.title || person.kunya ? `${person.title} ${person.kunya}` : '-'}</td>

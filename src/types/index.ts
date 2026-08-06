@@ -12,6 +12,7 @@ export enum TypePerson {
   included_extinct_females_only = 9,
   extinct_females_only = 10,
   unknown = 11,
+  not_unknown = 12,
 }
 
 export const TypePersonLabels: Record<TypePerson, string> = {
@@ -25,7 +26,8 @@ export const TypePersonLabels: Record<TypePerson, string> = {
   [TypePerson.smaller_larger]: 'د',
   [TypePerson.included_extinct_females_only]: 'ج ض ب',
   [TypePerson.extinct_females_only]: 'ض ب',
-  [TypePerson.unknown]: 'مجهول',
+  [TypePerson.unknown]: 'عادي',
+  [TypePerson.not_unknown]: '     ',
 };
 
 export const TypePersonDescriptions: Record<TypePerson, string> = {
@@ -39,7 +41,8 @@ export const TypePersonDescriptions: Record<TypePerson, string> = {
   [TypePerson.smaller_larger]: 'داخل',
   [TypePerson.included_extinct_females_only]: 'جامع منقرض بنات فقط',
   [TypePerson.extinct_females_only]: 'منقرض بنات فقط',
-  [TypePerson.unknown]: 'مجهول',
+  [TypePerson.unknown]: 'عادي',
+  [TypePerson.not_unknown]: '     ',
 };
 
 export enum TypeMother {
@@ -124,6 +127,10 @@ export interface ApiPerson {
   type_mother: TypeMother;
   number_mother: number | null;
   name_mother: string | null;
+  name_birth_place: string | null;
+  name_place_place: string | null;
+  name_death_place: string | null;
+  lineage_name: string | null;
   note: string | null;
   file: string | null;
   created_at: string;
@@ -163,6 +170,10 @@ export interface Person {
   name_type_mother?: string;
   number_mother: number | null;
   name_mother: string;
+  name_birth_place: string;
+  name_place_place: string;
+  name_death_place: string;
+  lineage_name: string;
   note: string;
   file: string | null;
   created_at: string;
@@ -234,6 +245,10 @@ export function mapApiPersonToPerson(api: ApiPerson, allPersons?: ApiPerson[]): 
     name_type_mother: api.name_type_mother,
     number_mother: api.number_mother,
     name_mother: api.name_mother || '',
+    name_birth_place: api.name_birth_place || '',
+    name_place_place: api.name_place_place || '',
+    name_death_place: api.name_death_place || '',
+    lineage_name: api.lineage_name || '',
     note: api.note || '',
     file: api.file,
     created_at: api.created_at,
@@ -299,6 +314,9 @@ export interface PersonFormData {
   type_mother: TypeMother;
   number_mother: number | null;
   name_mother: string;
+  name_birth_place: string;
+  name_place_place: string;
+  name_death_place: string;
   note: string;
   file: File | null;
 }

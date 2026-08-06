@@ -21,7 +21,7 @@ import dagre from 'dagre';
 import { Person } from '@/types';
 import { useAppStore } from '@/lib/store';
 import PersonNode from './PersonNode';
-import { ZoomIn, ZoomOut, Maximize, User } from 'lucide-react';
+import { ZoomIn, ZoomOut, Maximize, User, UserPlus } from 'lucide-react';
 
 const nodeTypes = {
   person: PersonNode,
@@ -68,12 +68,14 @@ interface FamilyTreeProps {
   persons: Person[];
   rootId?: number; // If provided, focuses on this sub-tree
   onNodeClick?: (personId: number) => void;
+  onAddChild?: (personId: number) => void;
 }
 
-function FamilyTreeInner({ persons, rootId, onNodeClick }: FamilyTreeProps) {
+function FamilyTreeInner({ persons, rootId, onNodeClick, onAddChild }: FamilyTreeProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const { selectedPersonId, setSelectedPersonId } = useAppStore();
+  const [contextMenu, setContextMenu] = useState<{ x: number, y: number, personId: number, personName: string } | null>(null);
 
   // Initialize graph
   useEffect(() => {
@@ -129,6 +131,26 @@ function FamilyTreeInner({ persons, rootId, onNodeClick }: FamilyTreeProps) {
     if (onNodeClick) onNodeClick(personId);
   }, [onNodeClick, setSelectedPersonId]);
 
+  const onNodeContextMenu = useCallback(
+    (event: React.MouseEvent, node: Node) => {
+      event.preventDefault();
+      setContextMenu({
+        x: event.clientX,
+        y: event.clientY,
+        personId: parseInt(node.id, 10),
+        personName: node.data.person ? (node.data.person as Person).name : '',
+      });
+    },
+    []
+  );
+
+  const closeContextMenu = useCallback(() => setContextMenu(null), []);
+
+  useEffect(() => {
+    document.addEventListener('click', closeContextMenu);
+    return () => document.removeEventListener('click', closeContextMenu);
+  }, [closeContextMenu]);
+
   return (
     <div className="tree-container">
       <ReactFlow
@@ -138,6 +160,7 @@ function FamilyTreeInner({ persons, rootId, onNodeClick }: FamilyTreeProps) {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeClick={handleNodeClick}
+        onNodeContextMenu={onNodeContextMenu}
         nodeTypes={nodeTypes}
         fitView
         fitViewOptions={{ padding: 0.2 }}
@@ -146,6 +169,39 @@ function FamilyTreeInner({ persons, rootId, onNodeClick }: FamilyTreeProps) {
       >
         <Background color="var(--border-strong)" gap={16} />
       </ReactFlow>
+      
+      {contextMenu && onAddChild && (
+        <div
+          style={{
+            position: 'fixed',
+            top: contextMenu.y,
+            left: contextMenu.x,
+            background: 'var(--bg-primary)',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: 'var(--radius-md)',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+            padding: 8,
+            zIndex: 1000,
+            minWidth: 150,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid var(--border-subtle)' }}>
+            خيارات {contextMenu.personName}
+          </div>
+          <button
+            className="btn btn-ghost btn-sm"
+            style={{ width: '100%', justifyContent: 'flex-start', color: 'var(--blue-400)' }}
+            onClick={() => {
+              onAddChild(contextMenu.personId);
+              closeContextMenu();
+            }}
+          >
+            <UserPlus size={16} />
+            إضافة ابن
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -25,6 +25,7 @@ import {
   Users,
   Heart,
   Tag,
+  UserPlus,
 } from 'lucide-react';
 
 interface PersonFormProps {
@@ -49,6 +50,9 @@ const defaultFormData: PersonFormData = {
   type_mother: TypeMother.alawi,
   number_mother: null,
   name_mother: '',
+  name_birth_place: '',
+  name_place_place: '',
+  name_death_place: '',
   note: '',
   file: null,
 };
@@ -78,6 +82,9 @@ export default function PersonForm({ person, onSuccess, defaultParentId }: Perso
         type_mother: person.type_mother,
         number_mother: person.number_mother,
         name_mother: person.name_mother,
+        name_birth_place: person.name_birth_place,
+        name_place_place: person.name_place_place,
+        name_death_place: person.name_death_place,
         note: person.note,
         file: null,
       });
@@ -112,8 +119,8 @@ export default function PersonForm({ person, onSuccess, defaultParentId }: Perso
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent, addAnother: boolean = false) => {
+    if (e) e.preventDefault();
     if (!validate()) return;
     
     setIsSubmitting(true);
@@ -131,9 +138,21 @@ export default function PersonForm({ person, onSuccess, defaultParentId }: Perso
           message: isEditing ? 'تم تحديث البيانات بنجاح' : 'تم إضافة الشخص بنجاح',
         });
         triggerRefresh();
-        onSuccess?.(result.data);
-        if (!isEditing) {
-          setForm({ ...defaultFormData, parent: defaultParentId || null });
+        
+        if (addAnother) {
+          setForm({ 
+            ...defaultFormData, 
+            parent: form.parent,
+            mother: form.mother,
+            type_person: form.type_person,
+            type_mother: form.type_mother 
+          });
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        } else {
+          onSuccess?.(result.data);
+          if (!isEditing) {
+            setForm({ ...defaultFormData, parent: defaultParentId || null });
+          }
         }
       } else {
         addToast({
@@ -367,6 +386,39 @@ export default function PersonForm({ person, onSuccess, defaultParentId }: Perso
             onChange={(id) => updateField('death_place', id)}
           />
         </div>
+
+        <div className="form-row">
+          <div className="form-group">
+            <label className="form-label">مكان الميلاد (نصي)</label>
+            <input
+              className="form-input"
+              type="text"
+              value={form.name_birth_place}
+              onChange={(e) => updateField('name_birth_place', e.target.value)}
+              placeholder="اكتب مكان الميلاد إن لم يكن في القائمة"
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label">مكان الإقامة (نصي)</label>
+            <input
+              className="form-input"
+              type="text"
+              value={form.name_place_place}
+              onChange={(e) => updateField('name_place_place', e.target.value)}
+              placeholder="اكتب مكان الإقامة"
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label">مكان الوفاة (نصي)</label>
+            <input
+              className="form-input"
+              type="text"
+              value={form.name_death_place}
+              onChange={(e) => updateField('name_death_place', e.target.value)}
+              placeholder="اكتب مكان الوفاة إن لم يكن في القائمة"
+            />
+          </div>
+        </div>
       </div>
 
       {/* القسم 6: ملاحظات وملفات */}
@@ -424,6 +476,22 @@ export default function PersonForm({ person, onSuccess, defaultParentId }: Perso
           )}
           {isEditing ? 'تحديث البيانات' : 'إضافة الشخص'}
         </button>
+        
+        {!isEditing && (
+          <button
+            type="button"
+            className="btn btn-secondary btn-lg"
+            onClick={(e) => handleSubmit(e, true)}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+              <span className="loading-spinner" />
+            ) : (
+              <UserPlus size={18} />
+            )}
+            حفظ وإضافة ابن آخر
+          </button>
+        )}
       </div>
     </form>
   );

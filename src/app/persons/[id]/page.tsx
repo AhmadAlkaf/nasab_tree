@@ -13,6 +13,7 @@ import SourceForm from '@/components/forms/SourceForm';
 import {
   User, Edit, Trash2, GitBranch, Heart, Book, MapPin, Calendar, FileText, Download
 } from 'lucide-react';
+import { truncateLineageName } from '@/lib/utils';
 
 export default function PersonDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -99,7 +100,7 @@ export default function PersonDetailsPage({ params }: { params: Promise<{ id: st
         </div>
         <div className="person-info" style={{ flex: 1 }}>
           <h1>
-            {person.name} {person.title && <span style={{ fontSize: 16, color: 'var(--text-muted)', fontWeight: 400 }}>({person.title})</span>}
+            {truncateLineageName(person.lineage_name || person.name)} {person.title && <span style={{ fontSize: 16, color: 'var(--text-muted)', fontWeight: 400 }}>({person.title})</span>}
           </h1>
           {person.kunya && <div style={{ color: 'var(--text-secondary)', marginBottom: 8 }}>{person.kunya}</div>}
           

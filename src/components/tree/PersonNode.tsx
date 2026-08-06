@@ -85,6 +85,11 @@ function PersonNode({ data }: NodeProps<Node<PersonNodeData>>) {
               {era}
             </span>
           )}
+          {person.level !== undefined && person.level !== null && (
+            <span className="badge muted" style={{ fontSize: 9, padding: '2px 6px' }}>
+              الطبقة {person.level}
+            </span>
+          )}
         </div>
       </div>
 

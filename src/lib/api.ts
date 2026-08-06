@@ -136,6 +136,9 @@ export async function createPerson(data: PersonFormData): Promise<ApiResponse<Pe
       formData.append('type_mother', data.type_mother.toString());
       if (data.number_mother !== null) formData.append('number_mother', data.number_mother.toString());
       formData.append('name_mother', data.name_mother || '');
+      formData.append('name_birth_place', data.name_birth_place || '');
+      formData.append('name_place_place', data.name_place_place || '');
+      formData.append('name_death_place', data.name_death_place || '');
       formData.append('note', data.note || '');
       formData.append('file', data.file);
       body = formData as unknown as string; // TypeScript workaround
@@ -149,6 +152,9 @@ export async function createPerson(data: PersonFormData): Promise<ApiResponse<Pe
         type_person: data.type_person,
         type_mother: data.type_mother,
         name_mother: data.name_mother || '',
+        name_birth_place: data.name_birth_place || '',
+        name_place_place: data.name_place_place || '',
+        name_death_place: data.name_death_place || '',
         note: data.note || '',
       };
       if (data.parent !== null) jsonData.parent = data.parent;
@@ -235,6 +241,7 @@ export async function searchPersons(query: string): Promise<ApiResponse<SearchRe
     let filtered = allPersons;
     if (q) {
       filtered = allPersons.filter(p =>
+        (p.lineage_name && p.lineage_name.toLowerCase().includes(q)) ||
         p.name.toLowerCase().includes(q) ||
         (p.kunya && p.kunya.toLowerCase().includes(q)) ||
         (p.title && p.title.toLowerCase().includes(q))
