@@ -3,64 +3,76 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Person, SearchResult, GenderLabels, TypePersonLabels } from '@/types';
-import { getPersons, searchPersons } from '@/lib/api';
+import { Person, GenderLabels, TypePersonLabels } from '@/types';
+import { getPersonsPage } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
-import { Search, UserPlus, ChevronLeft, User } from 'lucide-react';
+import { Search, UserPlus, ChevronLeft, User, ChevronRight, LoaderCircle } from 'lucide-react';
 import { truncateLineageName } from '@/lib/utils';
+
+function getVisiblePageNumbers(currentPage: number, totalPages: number): Array<number | null> {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1);
+  }
+
+  const pages = new Set([1, totalPages, currentPage, currentPage - 1, currentPage + 1]);
+  const orderedPages = Array.from(pages)
+    .filter(pageNumber => pageNumber > 0 && pageNumber <= totalPages)
+    .sort((first, second) => first - second);
+  const visiblePages: Array<number | null> = [];
+
+  orderedPages.forEach((pageNumber, index) => {
+    if (index > 0 && pageNumber - orderedPages[index - 1] > 1) {
+      visiblePages.push(null);
+    }
+    visiblePages.push(pageNumber);
+  });
+
+  return visiblePages;
+}
 
 export default function PersonsPage() {
   const [persons, setPersons] = useState<Person[]>([]);
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [query, setQuery] = useState('');
   const [filterGender, setFilterGender] = useState<string>('');
   const [filterType, setFilterType] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [totalCount, setTotalCount] = useState(0);
   const { refreshKey } = useAppStore();
   const router = useRouter();
 
   useEffect(() => {
     const fetchPersons = async () => {
       setIsLoading(true);
-      const res = await getPersons();
+      const res = await getPersonsPage(page, pageSize, {
+        search: query,
+        gender: filterGender,
+        type: filterType,
+      });
       if (res.success && res.data) {
-        setPersons(res.data);
+        setPersons(res.data.results);
+        setTotalCount(res.data.count);
       }
       setIsLoading(false);
     };
-    
-    if (!query) {
-      fetchPersons();
-    }
-  }, [refreshKey, query]);
 
-  useEffect(() => {
-    if (!query.trim()) {
-      setSearchResults([]);
-      return;
-    }
-    
-    const delaySearch = setTimeout(async () => {
-      setIsLoading(true);
-      const res = await searchPersons(query);
-      if (res.success && res.data) {
-        setSearchResults(res.data);
-      }
-      setIsLoading(false);
-    }, 300);
-    
+    const delaySearch = setTimeout(fetchPersons, query.trim() ? 300 : 0);
     return () => clearTimeout(delaySearch);
-  }, [query]);
+  }, [refreshKey, page, pageSize, query, filterGender, filterType]);
+
+  const changeFilter = (setter: (value: string) => void, value: string) => {
+    setter(value);
+    setPage(1);
+  };
 
   const handleRowClick = (id: number) => {
     router.push(`/persons/${id}`);
   };
 
-  const displayedPersons = (query ? searchResults.map(r => r.person) : persons).filter(person => {
-    if (filterGender && person.gender !== filterGender) return false;
-    if (filterType && person.type_person.toString() !== filterType) return false;
-    return true;
-  });
+  const displayedPersons = persons;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const pageNumbers = getVisiblePageNumbers(page, totalPages);
 
   return (
     <div>
@@ -86,14 +98,27 @@ export default function PersonsPage() {
               className="form-input"
               placeholder="ابحث بالاسم أو اللقب..."
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => changeFilter(setQuery, e.target.value)}
             />
           </div>
           <div style={{ display: 'flex', gap: '10px' }}>
             <select
               className="form-select"
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value));
+                setPage(1);
+              }}
+              aria-label="عدد النتائج في الصفحة"
+            >
+              <option value={25}>25 نتيجة</option>
+              <option value={50}>50 نتيجة</option>
+              <option value={100}>100 نتيجة</option>
+            </select>
+            <select
+              className="form-select"
               value={filterGender}
-              onChange={(e) => setFilterGender(e.target.value)}
+              onChange={(e) => changeFilter(setFilterGender, e.target.value)}
             >
               <option value="">كل الأجناس</option>
               <option value="M">ذكر</option>
@@ -102,7 +127,7 @@ export default function PersonsPage() {
             <select
               className="form-select"
               value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
+              onChange={(e) => changeFilter(setFilterType, e.target.value)}
             >
               <option value="">كل الأنواع</option>
               {Object.entries(TypePersonLabels).map(([key, label]) => (
@@ -183,6 +208,41 @@ export default function PersonsPage() {
               )}
             </tbody>
           </table>
+        </div>
+
+        <div className="pagination" aria-label="التنقل بين صفحات الأشخاص">
+          <span className="pagination-summary">
+            عرض {displayedPersons.length} من أصل {totalCount} نتيجة
+          </span>
+          <div className="pagination-controls">
+            <button className="btn btn-secondary btn-sm" disabled={page === 1 || isLoading} onClick={() => setPage(page - 1)}>
+              <ChevronRight size={16} /> السابقة
+            </button>
+            {pageNumbers.map((pageNumber, index) => (
+              pageNumber === null ? (
+                <span key={`ellipsis-${index}`} className="pagination-ellipsis">...</span>
+              ) : (
+                <button
+                  key={pageNumber}
+                  className={`btn btn-sm ${pageNumber === page ? 'btn-primary' : 'btn-secondary'}`}
+                  disabled={isLoading}
+                  onClick={() => setPage(pageNumber)}
+                  aria-current={pageNumber === page ? 'page' : undefined}
+                >
+                  {pageNumber}
+                </button>
+              )
+            ))}
+            <button className="btn btn-secondary btn-sm" disabled={page >= totalPages || isLoading} onClick={() => setPage(page + 1)}>
+              التالية <ChevronLeft size={16} />
+            </button>
+          </div>
+          {page < totalPages && (
+            <button className="pagination-next" disabled={isLoading} onClick={() => setPage(page + 1)}>
+              {isLoading ? <LoaderCircle className="loading-icon" size={16} /> : <ChevronLeft size={16} />}
+              {isLoading ? 'جاري تحميل الصفحة التالية...' : 'فتح الصفحة التالية'}
+            </button>
+          )}
         </div>
       </div>
     </div>

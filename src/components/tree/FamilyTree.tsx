@@ -12,16 +12,19 @@ import {
   Edge,
   Node,
   Panel,
+  MiniMap,
   ReactFlowProvider,
   MarkerType,
+  useReactFlow,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import dagre from 'dagre';
 
 import { Person } from '@/types';
 import { useAppStore } from '@/lib/store';
+import { getChildren } from '@/lib/api';
 import PersonNode from './PersonNode';
-import { ZoomIn, ZoomOut, Maximize, User, UserPlus } from 'lucide-react';
+import { UserPlus } from 'lucide-react';
 
 const nodeTypes = {
   person: PersonNode,
@@ -67,33 +70,150 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'TB') => 
 interface FamilyTreeProps {
   persons: Person[];
   rootId?: number; // If provided, focuses on this sub-tree
+  expandAll?: boolean;
   onNodeClick?: (personId: number) => void;
   onAddChild?: (personId: number) => void;
 }
 
-function FamilyTreeInner({ persons, rootId, onNodeClick, onAddChild }: FamilyTreeProps) {
+function FamilyTreeInner({ persons, rootId, expandAll = false, onNodeClick, onAddChild }: FamilyTreeProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
-  const { selectedPersonId, setSelectedPersonId } = useAppStore();
+  const { selectedPersonId, setSelectedPersonId, addToast } = useAppStore();
+  const { fitView } = useReactFlow();
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, personId: number, personName: string } | null>(null);
 
-  // Initialize graph
-  useEffect(() => {
-    if (!persons.length) return;
+  // Local state for loaded persons (starts with initial persons)
+  const [loadedPersons, setLoadedPersons] = useState<Person[]>([]);
+  const [expandedNodeIds, setExpandedNodeIds] = useState<Set<number>>(new Set());
+  const [isExpanding, setIsExpanding] = useState(false);
 
-    const initialNodes: Node[] = persons.map((person) => ({
+  // Sync loadedPersons when persons prop changes
+  useEffect(() => {
+    setLoadedPersons(persons);
+    if (expandAll) {
+      setExpandedNodeIds(new Set(persons.map(person => person.id)));
+      return;
+    }
+
+    if (rootId !== undefined) {
+      const hasRootChildren = persons.some(person => person.parent_id === rootId);
+      setExpandedNodeIds(hasRootChildren ? new Set([rootId]) : new Set());
+      return;
+    }
+
+    setExpandedNodeIds(new Set());
+  }, [persons, expandAll, rootId]);
+
+  // Compute visible persons based on expanded nodes
+  const visiblePersons = useMemo(() => {
+    if (!loadedPersons.length) return [];
+    
+    const visible: Person[] = [];
+    const personMap = new Map<number, Person>();
+    const childrenMap = new Map<number, Person[]>();
+    const roots: Person[] = [];
+    
+    loadedPersons.forEach(p => {
+      personMap.set(p.id, p);
+      if (p.parent_id === null) {
+        roots.push(p);
+      } else {
+        if (!childrenMap.has(p.parent_id)) {
+          childrenMap.set(p.parent_id, []);
+        }
+        childrenMap.get(p.parent_id)!.push(p);
+      }
+    });
+    
+    // Fallback: If a person has a parent that is not in the loaded list, treat them as root
+    loadedPersons.forEach(p => {
+      if (p.parent_id !== null && !personMap.has(p.parent_id)) {
+        roots.push(p);
+      }
+    });
+    
+    const traverse = (node: Person) => {
+      visible.push(node);
+      if (expandedNodeIds.has(node.id)) {
+        const children = childrenMap.get(node.id) || [];
+        children.forEach(traverse);
+      }
+    };
+    
+    const uniqueRoots = Array.from(new Set(roots));
+    uniqueRoots.forEach(traverse);
+    
+    return visible;
+  }, [loadedPersons, expandedNodeIds]);
+
+  // Callback to toggle node expansion (loads children on-demand if needed)
+  const handleToggleExpand = useCallback(async (personId: number) => {
+    if (expandedNodeIds.has(personId)) {
+      // Collapse
+      setExpandedNodeIds((prev) => {
+        const next = new Set(prev);
+        next.delete(personId);
+        return next;
+      });
+    } else {
+      // Check if children are already loaded locally
+      const hasChildrenLoaded = loadedPersons.some(p => p.parent_id === personId);
+      
+      if (hasChildrenLoaded) {
+        setExpandedNodeIds((prev) => {
+          const next = new Set(prev);
+          next.add(personId);
+          return next;
+        });
+      } else {
+        // Fetch children from API
+        setIsExpanding(true);
+        const res = await getChildren(personId);
+        setIsExpanding(false);
+        
+        if (res.success && res.data) {
+          if (res.data.length === 0) {
+            addToast({ type: 'info', message: 'لا يوجد أبناء مسجلين لهذا الشخص' });
+            return;
+          }
+          
+          setLoadedPersons((prev) => {
+            const existingIds = new Set(prev.map(p => p.id));
+            const newChildren = res.data!.filter(c => !existingIds.has(c.id));
+            return [...prev, ...newChildren];
+          });
+          
+          setExpandedNodeIds((prev) => {
+            const next = new Set(prev);
+            next.add(personId);
+            return next;
+          });
+        } else {
+          addToast({ type: 'error', message: res.error || 'حدث خطأ أثناء تحميل الأبناء' });
+        }
+      }
+    }
+  }, [expandedNodeIds, loadedPersons, addToast]);
+
+  // Initialize and update graph layout when visiblePersons change
+  useEffect(() => {
+    if (!visiblePersons.length) return;
+
+    const initialNodes: Node[] = visiblePersons.map((person) => ({
       id: person.id.toString(),
       type: 'person',
       position: { x: 0, y: 0 }, // Will be set by dagre
       data: { 
         person,
         isSelected: person.id === selectedPersonId,
+        isExpanded: expandedNodeIds.has(person.id),
+        onToggleExpand: handleToggleExpand,
       },
     }));
 
     const initialEdges: Edge[] = [];
-    persons.forEach((person) => {
-      if (person.parent_id) {
+    visiblePersons.forEach((person) => {
+      if (person.parent_id && visiblePersons.some(p => p.id === person.parent_id)) {
         // Edge from parent to child
         initialEdges.push({
           id: `e${person.parent_id}-${person.id}`,
@@ -118,7 +238,25 @@ function FamilyTreeInner({ persons, rootId, onNodeClick, onAddChild }: FamilyTre
 
     setNodes(layoutedNodes);
     setEdges(layoutedEdges);
-  }, [persons, setNodes, setEdges, selectedPersonId]);
+
+    // Wait for React Flow to render the updated nodes, then frame the whole tree.
+    requestAnimationFrame(() => {
+      fitView({ padding: 0.2, duration: 300 });
+    });
+  }, [visiblePersons, setNodes, setEdges, handleToggleExpand, expandedNodeIds, fitView]);
+
+  // Update selection status when selectedPersonId changes without re-layouting
+  useEffect(() => {
+    setNodes((nds) =>
+      nds.map((node) => ({
+        ...node,
+        data: {
+          ...node.data,
+          isSelected: parseInt(node.id, 10) === selectedPersonId,
+        },
+      }))
+    );
+  }, [selectedPersonId, setNodes]);
 
   const onConnect = useCallback(
     (params: Connection | Edge) => setEdges((eds) => addEdge(params, eds)),
@@ -168,6 +306,8 @@ function FamilyTreeInner({ persons, rootId, onNodeClick, onAddChild }: FamilyTre
         maxZoom={1.5}
       >
         <Background color="var(--border-strong)" gap={16} />
+        <Controls />
+        <MiniMap nodeColor="var(--gold-400)" />
       </ReactFlow>
       
       {contextMenu && onAddChild && (

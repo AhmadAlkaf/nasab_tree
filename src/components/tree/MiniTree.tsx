@@ -21,7 +21,9 @@ export default function MiniTree({ person, parent, grandparent }: MiniTreeProps)
           }}>
             <User size={16} />
           </div>
-          <span>{p.name}</span>
+          <span title={p.name} className="lineage-name">
+            {p.name}
+          </span>
         </div>
       </div>
     );

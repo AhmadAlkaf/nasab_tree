@@ -1,7 +1,8 @@
 import {
   Person, Wife, Source, City, ApiPerson,
   PersonFormData, WifeFormData, SourceFormData,
-  ApiResponse, SearchResult,
+  ApiResponse, PaginatedResponse, SearchResult,
+  DashboardData,
   mapApiPersonToPerson, mapApiWifeToWife, mapApiSourceToSource,
 } from '@/types';
 
@@ -52,25 +53,84 @@ async function apiFetch<T>(
     throw new Error(errorMsg);
   }
   
-  return res.json();
+  const responseData = await res.json();
+  if (
+    responseData &&
+    typeof responseData === 'object' &&
+    'success' in responseData &&
+    'data' in responseData
+  ) {
+    return (responseData as { data: T }).data;
+  }
+  return responseData as T;
 }
 
-// ===== In-memory cache for all persons (for tree building, search, etc.) =====
+// ===== Helper: Fetch a single paginated API page =====
+export async function fetchApiPersonsPage(url: string): Promise<PaginatedResponse<ApiPerson>> {
+  const rawResponse = (await apiFetch(url)) as Record<string, unknown> | ApiPerson[];
+  
+  let responseData: unknown = rawResponse;
+  if (rawResponse && typeof rawResponse === 'object' && !Array.isArray(rawResponse)) {
+    if ('success' in rawResponse && 'data' in rawResponse) {
+      responseData = rawResponse.data;
+    }
+  }
+  
+  if (Array.isArray(responseData)) {
+    return {
+      count: responseData.length,
+      next: null,
+      previous: null,
+      results: responseData as ApiPerson[],
+    };
+  }
+  
+  return responseData as PaginatedResponse<ApiPerson>;
+}
+
+// ===== Legacy cache helper (used only for global stats calculation) =====
 let _cachedPersons: ApiPerson[] | null = null;
 let _cacheTimestamp = 0;
-const CACHE_TTL = 5000; // 5 seconds
+const CACHE_TTL = 30000; // 30 seconds
 
 async function fetchAllApiPersons(force = false): Promise<ApiPerson[]> {
   const now = Date.now();
   if (!force && _cachedPersons && (now - _cacheTimestamp) < CACHE_TTL) {
     return _cachedPersons;
   }
-  _cachedPersons = await apiFetch<ApiPerson[]>('/persons/');
+  
+  let allResults: ApiPerson[] = [];
+  let url: string | null = '/persons/';
+  
+  while (url) {
+    const pageData = await fetchApiPersonsPage(url);
+    allResults = allResults.concat(pageData.results);
+    
+    if (pageData.next !== null && pageData.next !== undefined) {
+      if (typeof pageData.next === 'number') {
+        url = `/persons/?page=${pageData.next}`;
+      } else if (typeof pageData.next === 'string') {
+        try {
+          const nextUrl = new URL(pageData.next);
+          url = `/persons/${nextUrl.search}`;
+        } catch {
+          const idx = pageData.next.indexOf('?');
+          url = idx !== -1 ? `/persons/${pageData.next.substring(idx)}` : `/persons/?page=${pageData.next}`;
+        }
+      } else {
+        url = null;
+      }
+    } else {
+      url = null;
+    }
+  }
+  
+  _cachedPersons = allResults;
   _cacheTimestamp = now;
   return _cachedPersons;
 }
 
-function invalidateCache() {
+export function invalidateCache() {
   _cachedPersons = null;
   _cacheTimestamp = 0;
 }
@@ -94,9 +154,34 @@ function getLineage(personId: number, allPersons: ApiPerson[], depth: number = 4
 
 export async function getPersons(): Promise<ApiResponse<Person[]>> {
   try {
-    const apiPersons = await fetchAllApiPersons(true);
-    const persons = apiPersons.map(p => mapApiPersonToPerson(p, apiPersons));
+    // Only load the first page of persons to avoid fetching thousands of pages sequentially
+    const pageData = await fetchApiPersonsPage('/persons/');
+    const persons = pageData.results.map(p => mapApiPersonToPerson(p));
     return { success: true, data: persons };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export async function getPersonsPage(
+  page: number,
+  pageSize: number,
+  filters: { search?: string; gender?: string; type?: string } = {}
+): Promise<ApiResponse<PaginatedResponse<Person>>> {
+  try {
+    const params = new URLSearchParams({ page: page.toString(), page_size: pageSize.toString() });
+    if (filters.search?.trim()) params.set('search', filters.search.trim());
+    if (filters.gender) params.set('gender', filters.gender);
+    if (filters.type) params.set('type_person', filters.type);
+
+    const pageData = await fetchApiPersonsPage(`/persons/?${params.toString()}`);
+    return {
+      success: true,
+      data: {
+        ...pageData,
+        results: pageData.results.map(person => mapApiPersonToPerson(person)),
+      },
+    };
   } catch (err) {
     return { success: false, error: (err as Error).message };
   }
@@ -105,9 +190,45 @@ export async function getPersons(): Promise<ApiResponse<Person[]>> {
 export async function getPerson(id: number): Promise<ApiResponse<Person>> {
   try {
     const apiPerson = await apiFetch<ApiPerson>(`/persons/${id}/`);
-    // Also fetch all persons for parent/mother/children enrichment
-    const allPersons = await fetchAllApiPersons();
-    const person = mapApiPersonToPerson(apiPerson, allPersons);
+    
+    let parent: ApiPerson | null = null;
+    if (apiPerson.parent) {
+      try {
+        parent = await apiFetch<ApiPerson>(`/persons/${apiPerson.parent}/`);
+      } catch {
+        // ignore
+      }
+    }
+    
+    let mother: ApiPerson | null = null;
+    if (apiPerson.mother) {
+      try {
+        mother = await apiFetch<ApiPerson>(`/persons/${apiPerson.mother}/`);
+      } catch {
+        // ignore
+      }
+    }
+    
+    const person = mapApiPersonToPerson(apiPerson);
+    if (parent) person.parent = mapApiPersonToPerson(parent);
+    if (mother) person.mother = mapApiPersonToPerson(mother);
+
+    if (Array.isArray(apiPerson.children)) {
+      person.children = apiPerson.children.map(child => ({
+        ...mapApiPersonToPerson(child),
+        parent_id: id,
+      }));
+    } else {
+      try {
+        const childrenResponse = await getChildren(id);
+        person.children = childrenResponse.success && childrenResponse.data
+          ? childrenResponse.data.filter(child => child.parent_id === id)
+          : [];
+      } catch {
+        person.children = [];
+      }
+    }
+    
     return { success: true, data: person };
   } catch (err) {
     return { success: false, error: (err as Error).message };
@@ -235,22 +356,13 @@ export async function deletePerson(id: number): Promise<ApiResponse<null>> {
 
 export async function searchPersons(query: string): Promise<ApiResponse<SearchResult[]>> {
   try {
-    const allPersons = await fetchAllApiPersons();
     const q = query.toLowerCase().trim();
+    if (!q) return { success: true, data: [] };
     
-    let filtered = allPersons;
-    if (q) {
-      filtered = allPersons.filter(p =>
-        (p.lineage_name && p.lineage_name.toLowerCase().includes(q)) ||
-        p.name.toLowerCase().includes(q) ||
-        (p.kunya && p.kunya.toLowerCase().includes(q)) ||
-        (p.title && p.title.toLowerCase().includes(q))
-      );
-    }
-    
-    const results = filtered.slice(0, 15).map(p => ({
-      person: mapApiPersonToPerson(p, allPersons),
-      lineage: getLineage(p.id, allPersons),
+    const pageData = await fetchApiPersonsPage(`/persons/?search=${encodeURIComponent(q)}`);
+    const results = pageData.results.slice(0, 15).map(p => ({
+      person: mapApiPersonToPerson(p),
+      lineage: p.lineage_name || p.name,
     }));
     
     return { success: true, data: results };
@@ -259,31 +371,134 @@ export async function searchPersons(query: string): Promise<ApiResponse<SearchRe
   }
 }
 
+async function fetchHighestLevelPersons(): Promise<ApiPerson[]> {
+  const rawResponse = await apiFetch<unknown>('/persons/highest_level/');
+
+  if (rawResponse && typeof rawResponse === 'object' && !Array.isArray(rawResponse)) {
+    if ('success' in rawResponse && 'data' in rawResponse && Array.isArray((rawResponse as any).data)) {
+      return (rawResponse as any).data as ApiPerson[];
+    }
+    if ('results' in rawResponse && Array.isArray((rawResponse as any).results)) {
+      return (rawResponse as any).results as ApiPerson[];
+    }
+  }
+
+  if (Array.isArray(rawResponse)) {
+    return rawResponse as ApiPerson[];
+  }
+
+  throw new Error('Invalid highest level response');
+}
+
+function flattenPersonTree(person: Person): Person[] {
+  const result: Person[] = [person];
+  if (Array.isArray(person.children) && person.children.length > 0) {
+    person.children.forEach((child) => {
+      result.push(...flattenPersonTree(child));
+    });
+  }
+  return result;
+}
+
 export async function getPersonTree(rootId?: number): Promise<ApiResponse<Person[]>> {
   try {
-    const allApiPersons = await fetchAllApiPersons(true);
-    
-    let filtered = allApiPersons;
     if (rootId) {
-      // Get subtree from root
-      const collectDescendants = (parentId: number): ApiPerson[] => {
-        const children = allApiPersons.filter(p => p.parent === parentId);
-        const result: ApiPerson[] = [];
-        for (const child of children) {
-          result.push(child);
-          result.push(...collectDescendants(child.id));
-        }
-        return result;
-      };
-      
-      const root = allApiPersons.find(p => p.id === rootId);
-      if (!root) return { success: false, error: 'الجذر غير موجود' };
-      
-      filtered = [root, ...collectDescendants(rootId)];
+      const apiPerson = await apiFetch<ApiPerson>(`/persons/${rootId}/`);
+      const rootPerson = mapApiPersonToPerson(apiPerson);
+      const persons = flattenPersonTree(rootPerson);
+      return { success: true, data: persons };
     }
     
-    const persons = filtered.map(p => mapApiPersonToPerson(p, allApiPersons));
+    // Fetch page 1 to find the root node (parent === null)
+    const pageData = await fetchApiPersonsPage('/persons/');
+    const roots = pageData.results.filter(p => p.parent === null);
+    
+    const startingNodes = roots.length > 0 ? roots : (pageData.results.length > 0 ? [pageData.results[0]] : []);
+    const persons = startingNodes.map(p => mapApiPersonToPerson(p));
     return { success: true, data: persons };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export async function getLastLevelPersonTree(): Promise<ApiResponse<Person[]>> {
+  try {
+    let apiPersons: ApiPerson[];
+    try {
+      apiPersons = await fetchHighestLevelPersons();
+    } catch (highestLevelError) {
+      const allApiPersons = await fetchAllApiPersons();
+      const maxLevel = allApiPersons.reduce((max, person) => Math.max(max, person.level), 0);
+      apiPersons = allApiPersons.filter(person => person.level === maxLevel);
+    }
+
+    return {
+      success: true,
+      data: apiPersons.map(person => mapApiPersonToPerson(person)),
+    };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export async function getFullPersonTree(): Promise<ApiResponse<Person[]>> {
+  try {
+    const apiPersons = await fetchAllApiPersons(true);
+    return {
+      success: true,
+      // FamilyTree renders a flat list using parent_id. Passing the complete list
+      // here makes the mapper recursively build both parent and children, creating
+      // a parent <-> child cycle that prevents the full tree from being displayed.
+      data: apiPersons.map(person => mapApiPersonToPerson(person)),
+    };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export async function getChildren(parentId: number): Promise<ApiResponse<Person[]>> {
+  try {
+    const apiPerson = await apiFetch<ApiPerson>(`/persons/${parentId}/`);
+
+    if (Array.isArray(apiPerson.children)) {
+      return {
+        success: true,
+        data: apiPerson.children.map(child => mapApiPersonToPerson(child, undefined, parentId)),
+      };
+    }
+
+    // Fallback: if the detail endpoint does not include full children objects,
+    // then load children by parent filter.
+    let allChildren: ApiPerson[] = [];
+    let url: string | null = `/persons/?parent=${parentId}`;
+
+    while (url) {
+      const pageData = await fetchApiPersonsPage(url);
+      allChildren = allChildren.concat(pageData.results);
+
+      if (pageData.next !== null && pageData.next !== undefined) {
+        if (typeof pageData.next === 'number') {
+          url = `/persons/?parent=${parentId}&page=${pageData.next}`;
+        } else if (typeof pageData.next === 'string') {
+          try {
+            const nextUrl = new URL(pageData.next);
+            url = `/persons/${nextUrl.search}`;
+          } catch {
+            const idx = pageData.next.indexOf('?');
+            url = idx !== -1 ? `/persons/${pageData.next.substring(idx)}` : null;
+          }
+        } else {
+          url = null;
+        }
+      } else {
+        url = null;
+      }
+    }
+
+    const children = allChildren
+      .filter(child => child.parent === parentId)
+      .map(child => mapApiPersonToPerson(child));
+    return { success: true, data: children };
   } catch (err) {
     return { success: false, error: (err as Error).message };
   }
@@ -524,6 +739,15 @@ export async function searchCities(query: string): Promise<ApiResponse<City[]>> 
 
 // ===== Stats =====
 
+export async function getDashboard(): Promise<ApiResponse<DashboardData>> {
+  try {
+    const response = await apiFetch<DashboardData>('/dashboard/');
+    return { success: true, data: response };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
 export async function getStats(): Promise<ApiResponse<{
   totalPersons: number;
   totalMales: number;
@@ -533,28 +757,20 @@ export async function getStats(): Promise<ApiResponse<{
   generations: number;
 }>> {
   try {
-    const apiPersons = await fetchAllApiPersons(true);
-    
-    // Calculate generations from level field
-    const maxLevel = apiPersons.reduce((max, p) => Math.max(max, p.level), 0);
-    
-    // Count wives and sources from embedded data
-    let totalWives = 0;
-    let totalSources = 0;
-    apiPersons.forEach(p => {
-      totalWives += (p.wife || []).length;
-      totalSources += (p.source || []).length;
-    });
-    
+    const response = await getDashboard();
+    if (!response.success || !response.data) {
+      return { success: false, error: response.error || 'تعذر تحميل بيانات لوحة المعلومات' };
+    }
+    const dashboard = response.data;
     return {
       success: true,
       data: {
-        totalPersons: apiPersons.length,
-        totalMales: apiPersons.filter(p => p.gender === 'M').length,
-        totalFemales: apiPersons.filter(p => p.gender === 'F').length,
-        totalWives,
-        totalSources,
-        generations: maxLevel + 1,
+        totalPersons: dashboard.count_person,
+        totalMales: dashboard.count_person_gender_male,
+        totalFemales: dashboard.count_person_gender_female,
+        totalWives: dashboard.count_wife,
+        totalSources: dashboard.count_source,
+        generations: dashboard.max_level,
       },
     };
   } catch (err) {

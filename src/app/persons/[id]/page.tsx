@@ -100,7 +100,13 @@ export default function PersonDetailsPage({ params }: { params: Promise<{ id: st
         </div>
         <div className="person-info" style={{ flex: 1 }}>
           <h1>
-            {truncateLineageName(person.lineage_name || person.name)} {person.title && <span style={{ fontSize: 16, color: 'var(--text-muted)', fontWeight: 400 }}>({person.title})</span>}
+            <span
+              title={person.lineage_name || person.name}
+              className="lineage-name"
+            >
+              {truncateLineageName(person.lineage_name || person.name, 8)}
+            </span>{' '}
+            {person.title && <span style={{ fontSize: 16, color: 'var(--text-muted)', fontWeight: 400 }}>({person.title})</span>}
           </h1>
           {person.kunya && <div style={{ color: 'var(--text-secondary)', marginBottom: 8 }}>{person.kunya}</div>}
           
@@ -144,7 +150,7 @@ export default function PersonDetailsPage({ params }: { params: Promise<{ id: st
                         onClick={() => router.push(`/persons/${person.parent_id}`)}
                       >
                         <User size={14} />
-                        {person.parent.name}
+                        {truncateLineageName(person.parent.lineage_name || person.parent.name, 8)}
                       </span>
                     ) : 'غير محدد'}
                   </div>
@@ -339,7 +345,12 @@ export default function PersonDetailsPage({ params }: { params: Promise<{ id: st
                       onClick={() => router.push(`/persons/${child.id}`)}
                     >
                       <div className="list-item-content">
-                        <div className="list-item-title">{child.name}</div>
+                        <div
+                          className="list-item-title lineage-name"
+                          title={child.lineage_name || child.name}
+                        >
+                          {truncateLineageName(child.lineage_name || child.name, 8)}
+                        </div>
                       </div>
                       <span className={`badge ${child.gender === 'M' ? 'blue' : 'pink'}`}>
                         {GenderLabels[child.gender]}

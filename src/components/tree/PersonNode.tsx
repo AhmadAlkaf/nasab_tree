@@ -8,7 +8,9 @@ import { User, Crown, Edit } from 'lucide-react';
 type PersonNodeData = {
   person: Person;
   isSelected?: boolean;
+  isExpanded?: boolean;
   onEdit?: (personId: number) => void;
+  onToggleExpand?: (personId: number) => void;
 };
 
 // Simple helper to calculate era (century) based on birth year
@@ -19,12 +21,13 @@ const getEra = (year?: number | null) => {
 };
 
 function PersonNode({ data }: NodeProps<Node<PersonNodeData>>) {
-  const { person, isSelected, onEdit } = data;
+  const { person, isSelected, onEdit, isExpanded, onToggleExpand } = data;
   
   const isMale = person.gender === 'M';
   const colorClass = isMale ? 'male' : 'female';
   const iconColor = isMale ? 'var(--blue-400)' : 'var(--pink-400)';
   const era = getEra(person.birth_year);
+  const hasChildren = !!person.has_children || person.rght > person.lft + 1;
   
   return (
     <>
@@ -91,13 +94,56 @@ function PersonNode({ data }: NodeProps<Node<PersonNodeData>>) {
             </span>
           )}
         </div>
+
+        {/* Toggle Expand/Collapse Button */}
+        {hasChildren && onToggleExpand && (
+          <button
+            className={`node-expand-btn ${isExpanded ? 'expanded' : ''}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleExpand(person.id);
+            }}
+            style={{
+              position: 'absolute',
+              bottom: -12,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: 24,
+              height: 24,
+              borderRadius: '50%',
+              background: 'var(--bg-secondary)',
+              border: '2px solid var(--border-strong)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--text-muted)',
+              cursor: 'pointer',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+              zIndex: 10,
+              fontSize: 16,
+              lineHeight: 1,
+            }}
+            title={isExpanded ? 'طي الفروع' : 'عرض الأبناء'}
+          >
+            {isExpanded ? '−' : '+'}
+          </button>
+        )}
       </div>
 
-      <Handle 
-        type="source" 
-        position={Position.Bottom} 
-        style={{ background: 'var(--text-muted)', width: 8, height: 8, border: 'none' }}
-      />
+      {/* Show source handle only if node has children and is expanded */}
+      {hasChildren && isExpanded && (
+        <Handle 
+          type="source" 
+          position={Position.Bottom} 
+          style={{ 
+            background: 'var(--text-muted)', 
+            width: 8, 
+            height: 8, 
+            border: 'none',
+            bottom: -18 // Shift down below the expand button
+          }}
+        />
+      )}
     </>
   );
 }

@@ -143,6 +143,7 @@ export interface ApiPerson {
   birth_place: number | null;
   death_place: number | null;
   mother: number | null;
+  children?: ApiPerson[] | boolean;
 }
 
 // ===== Internal Person model (enriched) =====
@@ -179,6 +180,9 @@ export interface Person {
   created_at: string;
   updated_at: string;
   level: number;
+  lft: number;
+  rght: number;
+  has_children?: boolean;
   children?: Person[];
   wives?: Wife[];
   sources?: Source[];
@@ -220,9 +224,10 @@ export interface Source {
 
 // ===== Mapping functions =====
 
-export function mapApiPersonToPerson(api: ApiPerson, allPersons?: ApiPerson[]): Person {
+export function mapApiPersonToPerson(api: ApiPerson, allPersons?: ApiPerson[], parentId: number | null = null): Person {
   const parentPerson = allPersons?.find(p => p.id === api.parent);
   const motherPerson = allPersons?.find(p => p.id === api.mother);
+  const resolvedParentId = api.parent ?? parentId ?? null;
 
   return {
     id: api.id,
@@ -230,8 +235,8 @@ export function mapApiPersonToPerson(api: ApiPerson, allPersons?: ApiPerson[]): 
     kunya: api.kunya || '',
     title: api.title || '',
     gender: api.gender,
-    parent_id: api.parent,
-    parent: parentPerson ? mapApiPersonToPerson(parentPerson) : null,
+    parent_id: resolvedParentId,
+    parent: parentPerson ? mapApiPersonToPerson(parentPerson, allPersons) : null,
     type_person: api.type_person,
     name_type_person: api.name_type_person,
     birth_year: api.birth_year,
@@ -240,7 +245,7 @@ export function mapApiPersonToPerson(api: ApiPerson, allPersons?: ApiPerson[]): 
     birth_place_id: api.birth_place,
     death_place_id: api.death_place,
     mother_id: api.mother,
-    mother: motherPerson ? mapApiPersonToPerson(motherPerson) : null,
+    mother: motherPerson ? mapApiPersonToPerson(motherPerson, allPersons) : null,
     type_mother: api.type_mother,
     name_type_mother: api.name_type_mother,
     number_mother: api.number_mother,
@@ -254,11 +259,16 @@ export function mapApiPersonToPerson(api: ApiPerson, allPersons?: ApiPerson[]): 
     created_at: api.created_at,
     updated_at: api.updated_at,
     level: api.level,
+    lft: api.lft,
+    rght: api.rght,
     wives: api.wife?.map(w => mapApiWifeToWife(w)),
     sources: api.source?.map(s => mapApiSourceToSource(s)),
+    has_children: api.children === true,
     children: allPersons
-      ? allPersons.filter(p => p.parent === api.id).map(p => mapApiPersonToPerson(p))
-      : undefined,
+      ? allPersons.filter(p => p.parent === api.id).map(p => mapApiPersonToPerson(p, allPersons))
+      : Array.isArray(api.children)
+        ? api.children.map(child => mapApiPersonToPerson(child, undefined, api.id))
+        : undefined,
   };
 }
 
@@ -369,6 +379,22 @@ export interface ApiResponse<T> {
   success: boolean;
   data?: T;
   error?: string;
+}
+
+export interface PaginatedResponse<T> {
+  count: number;
+  next: string | number | null;
+  previous: string | number | null;
+  results: T[];
+}
+
+export interface DashboardData {
+  count_person: number;
+  count_person_gender_male: number;
+  count_person_gender_female: number;
+  max_level: number;
+  count_wife: number;
+  count_source: number;
 }
 
 export interface SearchResult {
