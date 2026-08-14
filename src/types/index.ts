@@ -388,6 +388,12 @@ export interface PaginatedResponse<T> {
   results: T[];
 }
 
+export interface FullPersonTreeResponse {
+  cached: boolean;
+  count: number;
+  results: ApiPerson[];
+}
+
 export interface DashboardData {
   count_person: number;
   count_person_gender_male: number;

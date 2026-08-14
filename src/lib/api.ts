@@ -2,7 +2,7 @@ import {
   Person, Wife, Source, City, ApiPerson,
   PersonFormData, WifeFormData, SourceFormData,
   ApiResponse, PaginatedResponse, SearchResult,
-  DashboardData,
+  DashboardData, FullPersonTreeResponse,
   mapApiPersonToPerson, mapApiWifeToWife, mapApiSourceToSource,
 } from '@/types';
 
@@ -443,14 +443,26 @@ export async function getLastLevelPersonTree(): Promise<ApiResponse<Person[]>> {
 
 export async function getFullPersonTree(): Promise<ApiResponse<Person[]>> {
   try {
-    const apiPersons = await fetchAllApiPersons(true);
-    return {
-      success: true,
-      // FamilyTree renders a flat list using parent_id. Passing the complete list
-      // here makes the mapper recursively build both parent and children, creating
-      // a parent <-> child cycle that prevents the full tree from being displayed.
-      data: apiPersons.map(person => mapApiPersonToPerson(person)),
-    };
+    // This endpoint is purpose-built for the complete tree: it returns every
+    // person in one response, so no paginated requests are required.
+    const response = await apiFetch<FullPersonTreeResponse>('/persons/full-tree/');
+    if (!Array.isArray(response.results)) {
+      throw new Error('صيغة استجابة الشجرة الكاملة غير صالحة');
+    }
+
+    const persons = response.results.map((person) => {
+      const hasChildren = person.children === true ||
+        (Array.isArray(person.children) && person.children.length > 0);
+
+      // FamilyTree renders relationships from parent_id. The children field in the
+      // endpoint is a compact preview, so use it only as an expansion indicator.
+      return {
+        ...mapApiPersonToPerson({ ...person, children: hasChildren }),
+        has_children: hasChildren,
+      };
+    });
+
+    return { success: true, data: persons };
   } catch (err) {
     return { success: false, error: (err as Error).message };
   }
