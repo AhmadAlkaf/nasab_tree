@@ -2,9 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { getStats } from '@/lib/api';
-import { Users, UserPlus, GitBranch, Search, Book, Heart } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { getStats, getRequsersPage } from '@/lib/api';
+import {
+  Users, UserPlus, GitBranch, Search, Book, Heart,
+  ClipboardList, Plus, ChevronLeft, User, Calendar, MapPin
+} from 'lucide-react';
 import { useAppStore } from '@/lib/store';
+import { Requser, TypeRequsetLabels } from '@/types';
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -15,16 +20,29 @@ export default function Dashboard() {
     totalSources: 0,
     generations: 0,
   });
+  const [recentRequests, setRecentRequests] = useState<Requser[]>([]);
+  const [totalRequests, setTotalRequests] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const { refreshKey } = useAppStore();
+  const router = useRouter();
 
   useEffect(() => {
     const fetchStats = async () => {
       setIsLoading(true);
-      const res = await getStats();
-      if (res.success && res.data) {
-        setStats(res.data);
+      const [statsRes, requestsRes] = await Promise.all([
+        getStats(),
+        getRequsersPage(1, 5, {}),
+      ]);
+
+      if (statsRes.success && statsRes.data) {
+        setStats(statsRes.data);
       }
+
+      if (requestsRes.success && requestsRes.data) {
+        setRecentRequests(requestsRes.data.results);
+        setTotalRequests(requestsRes.data.count);
+      }
+
       setIsLoading(false);
     };
     fetchStats();
@@ -35,7 +53,7 @@ export default function Dashboard() {
       <div className="page-header">
         <div>
           <h1 className="page-title">لوحة المعلومات</h1>
-          <div className="page-subtitle">نظرة عامة على بيانات الشجرة النسبية</div>
+          <div className="page-subtitle">نظرة عامة على بيانات شجرة الأنساب والطلبات</div>
         </div>
       </div>
 
@@ -46,37 +64,41 @@ export default function Dashboard() {
         </div>
       ) : (
         <>
+          {/* إحصائيات الشجرة */}
+          <h2 style={{ fontSize: 14, fontWeight: 600, marginBottom: 12, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1 }}>
+            إحصائيات الشجرة
+          </h2>
           <div className="stat-grid">
             <div className="stat-card gold">
               <div className="stat-icon gold"><Users size={22} /></div>
               <div className="stat-value">{stats.totalPersons}</div>
               <div className="stat-label">إجمالي الأشخاص</div>
             </div>
-            
+
             <div className="stat-card blue">
               <div className="stat-icon blue"><Users size={22} /></div>
               <div className="stat-value">{stats.totalMales}</div>
               <div className="stat-label">الذكور</div>
             </div>
-            
+
             <div className="stat-card pink">
               <div className="stat-icon pink"><Users size={22} /></div>
               <div className="stat-value">{stats.totalFemales}</div>
               <div className="stat-label">الإناث</div>
             </div>
-            
+
             <div className="stat-card emerald">
               <div className="stat-icon emerald"><GitBranch size={22} /></div>
               <div className="stat-value">{stats.generations}</div>
               <div className="stat-label">الأجيال (الطبقات)</div>
             </div>
-            
+
             <div className="stat-card amber">
               <div className="stat-icon amber"><Heart size={22} /></div>
               <div className="stat-value">{stats.totalWives}</div>
               <div className="stat-label">الزوجات المسجلات</div>
             </div>
-            
+
             <div className="stat-card red">
               <div className="stat-icon red"><Book size={22} /></div>
               <div className="stat-value">{stats.totalSources}</div>
@@ -84,10 +106,80 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16, color: 'var(--text-primary)' }}>
+          {/* إحصائيات الطلبات */}
+          <h2 style={{ fontSize: 14, fontWeight: 600, marginBottom: 12, marginTop: 32, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1 }}>
+            إحصائيات الطلبات
+          </h2>
+          <div className="stat-grid">
+            <div className="stat-card blue">
+              <div className="stat-icon blue"><ClipboardList size={22} /></div>
+              <div className="stat-value">{totalRequests}</div>
+              <div className="stat-label">إجمالي الطلبات</div>
+            </div>
+          </div>
+
+          {/* آخر الطلبات */}
+          {recentRequests.length > 0 && (
+            <>
+              <h2 style={{ fontSize: 14, fontWeight: 600, marginBottom: 12, marginTop: 32, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1 }}>
+                آخر الطلبات
+              </h2>
+              <div className="card">
+                <div className="card-body" style={{ padding: 0 }}>
+                  {recentRequests.map((req) => (
+                    <div
+                      key={req.id}
+                      className="list-item"
+                      onClick={() => router.push(`/requests/${req.id}`)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <div className="list-item-avatar" style={{ background: 'rgba(59,130,246,0.1)', color: 'var(--blue-400)' }}>
+                        <User size={16} />
+                      </div>
+                      <div className="list-item-content">
+                        <div className="list-item-title">{req.full_name}</div>
+                        <div className="list-item-subtitle" style={{ display: 'flex', gap: 12, marginTop: 2 }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <MapPin size={12} />
+                            {req.name_place || req.home}
+                          </span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <Calendar size={12} />
+                            {new Date(req.created_at).toLocaleDateString('ar-SA')}
+                          </span>
+                        </div>
+                      </div>
+                      <span className="badge blue">
+                        {TypeRequsetLabels[req.type_requser]}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <div className="card-footer" style={{ justifyContent: 'center' }}>
+                  <Link href="/requests" className="btn btn-ghost btn-sm">
+                    عرض جميع الطلبات
+                    <ChevronLeft size={16} />
+                  </Link>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* إجراءات سريعة */}
+          <h2 style={{ fontSize: 14, fontWeight: 600, marginBottom: 12, marginTop: 32, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1 }}>
             إجراءات سريعة
           </h2>
           <div className="quick-actions">
+            <Link href="/requests/new" className="quick-action">
+              <div className="quick-action-icon" style={{ background: 'rgba(59,130,246,0.1)', color: 'var(--blue-400)' }}>
+                <Plus size={20} />
+              </div>
+              <div>
+                <div className="quick-action-title">إضافة طلب جديد</div>
+                <div className="quick-action-desc">تسجيل طلب تسجيل نسب جديد</div>
+              </div>
+            </Link>
+
             <Link href="/persons/new" className="quick-action">
               <div className="quick-action-icon" style={{ background: 'rgba(212,168,83,0.1)', color: 'var(--gold-400)' }}>
                 <UserPlus size={20} />
@@ -97,7 +189,7 @@ export default function Dashboard() {
                 <div className="quick-action-desc">تسجيل فرد جديد في الشجرة</div>
               </div>
             </Link>
-            
+
             <Link href="/tree" className="quick-action">
               <div className="quick-action-icon" style={{ background: 'rgba(16,185,129,0.1)', color: 'var(--emerald-400)' }}>
                 <GitBranch size={20} />
@@ -107,14 +199,14 @@ export default function Dashboard() {
                 <div className="quick-action-desc">تصفح العلاقات الهرمية بصرياً</div>
               </div>
             </Link>
-            
+
             <Link href="/persons" className="quick-action">
-              <div className="quick-action-icon" style={{ background: 'rgba(59,130,246,0.1)', color: 'var(--blue-400)' }}>
+              <div className="quick-action-icon" style={{ background: 'rgba(236,72,153,0.1)', color: 'var(--pink-400)' }}>
                 <Search size={20} />
               </div>
               <div>
-                <div className="quick-action-title">البحث في السجل</div>
-                <div className="quick-action-desc">استعراض وتعديل بيانات الأفراد</div>
+                <div className="quick-action-title">إدارة الإثبات</div>
+                <div className="quick-action-desc">بحث وإثبات النسب</div>
               </div>
             </Link>
           </div>

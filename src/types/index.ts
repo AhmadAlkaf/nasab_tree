@@ -63,6 +63,64 @@ export const TypeMotherLabels: Record<TypeMother, string> = {
   [TypeMother.unknown]: 'لم تعرف لدينا',
 };
 
+// ===== Request Enums =====
+
+export enum StatusRequset {
+  Search = 1,
+  Under_documentation = 2,
+  rejection = 3,
+  Registration = 4,
+  patchy = 5,
+  not_accepted = 6,
+  Contacting = 7,
+}
+
+export const StatusRequsetLabels: Record<StatusRequset, string> = {
+  [StatusRequset.Search]: 'جاري البحث',
+  [StatusRequset.Under_documentation]: 'قيد التدوين',
+  [StatusRequset.rejection]: 'تم رفض النسب',
+  [StatusRequset.Registration]: 'تم التسجيل',
+  [StatusRequset.patchy]: 'غير مكتمل',
+  [StatusRequset.not_accepted]: 'مشهور النسب',
+  [StatusRequset.Contacting]: 'التواصل مع المعرفين',
+};
+
+export enum TypeRequset {
+  request = 1,
+  descending = 2,
+}
+
+export const TypeRequsetLabels: Record<TypeRequset, string> = {
+  [TypeRequset.request]: 'طلب',
+  [TypeRequset.descending]: 'نزول',
+};
+
+export enum TypeDocument {
+  passport = 1,
+  personal_card = 2,
+  Other = 3,
+}
+
+export const TypeDocumentLabels: Record<TypeDocument, string> = {
+  [TypeDocument.passport]: 'جواز سفر',
+  [TypeDocument.personal_card]: 'بطاقة شخصية',
+  [TypeDocument.Other]: 'أخرى',
+};
+
+export enum TypeForm {
+  grandfathe_fathe_name = 1,
+  grandfathe = 2,
+  father = 3,
+  request = 4,
+}
+
+export const TypeFormLabels: Record<TypeForm, string> = {
+  [TypeForm.grandfathe_fathe_name]: 'اسم الأب الجد',
+  [TypeForm.grandfathe]: 'اسم الجد',
+  [TypeForm.father]: 'اسم الأب',
+  [TypeForm.request]: 'اسم طالب التسجيل',
+};
+
 export type Gender = 'M' | 'F';
 
 export const GenderLabels: Record<Gender, string> = {
@@ -406,4 +464,186 @@ export interface DashboardData {
 export interface SearchResult {
   person: Person;
   lineage: string;
+}
+
+// ===== Request Models =====
+
+export interface ApiRequser {
+  id: number;
+  type_requser: TypeRequset;
+  name_place: string | null;
+  place: number | null;
+  full_name: string;
+  name_fiamy: string;
+  name_thigh: string;
+  home: string;
+  type_document: TypeDocument;
+  signature: string;
+  number_document: string;
+  image_document: string;
+  phone: string | null;
+  phone_whatapp: string | null;
+  language: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Requser {
+  id: number;
+  type_requser: TypeRequset;
+  name_place: string | null;
+  place_id: number | null;
+  place?: City | null;
+  full_name: string;
+  name_fiamy: string;
+  name_thigh: string;
+  home: string;
+  type_document: TypeDocument;
+  signature: string;
+  number_document: string;
+  image_document: string;
+  phone: string | null;
+  phone_whatapp: string | null;
+  language: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RequestFormData {
+  type_requser: TypeRequset;
+  name_place: string;
+  place: number | null;
+  full_name: string;
+  name_fiamy: string;
+  name_thigh: string;
+  home: string;
+  type_document: TypeDocument;
+  signature: File | null;
+  number_document: string;
+  image_document: File | null;
+  phone: string;
+  phone_whatapp: string;
+  language: string;
+}
+
+export interface ApiStatusRequserDcm {
+  id: number;
+  requser: number;
+  status_requset: StatusRequset;
+  note: string | null;
+  file: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StatusRequserDcm {
+  id: number;
+  requser_id: number;
+  status_requset: StatusRequset;
+  note: string | null;
+  file: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ApiFormRequser {
+  id: number;
+  name: string;
+  requser: number;
+  gender: Gender;
+  type_form: TypeForm;
+  parent: number | null;
+  birth_year: number | null;
+  death_year: number | null;
+  birth_place: number | null;
+  death_place: number | null;
+  name_birth_place: string | null;
+  name_place_place: string | null;
+  name_death_place: string | null;
+  type_mother: TypeMother;
+  name_mother: string | null;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FormRequser {
+  id: number;
+  name: string;
+  requser_id: number;
+  gender: Gender;
+  type_form: TypeForm;
+  parent_id: number | null;
+  birth_year: number | null;
+  death_year: number | null;
+  birth_place_id: number | null;
+  death_place_id: number | null;
+  name_birth_place: string | null;
+  name_place_place: string | null;
+  name_death_place: string | null;
+  type_mother: TypeMother;
+  name_mother: string | null;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+  children?: FormRequser[];
+}
+
+// ===== Request Mapping Functions =====
+
+export function mapApiRequserToRequser(api: ApiRequser): Requser {
+  return {
+    id: api.id,
+    type_requser: api.type_requser,
+    name_place: api.name_place,
+    place_id: api.place,
+    full_name: api.full_name,
+    name_fiamy: api.name_fiamy,
+    name_thigh: api.name_thigh,
+    home: api.home,
+    type_document: api.type_document,
+    signature: api.signature,
+    number_document: api.number_document,
+    image_document: api.image_document,
+    phone: api.phone,
+    phone_whatapp: api.phone_whatapp,
+    language: api.language,
+    created_at: api.created_at,
+    updated_at: api.updated_at,
+  };
+}
+
+export function mapApiStatusRequserDcmToStatus(api: ApiStatusRequserDcm): StatusRequserDcm {
+  return {
+    id: api.id,
+    requser_id: api.requser,
+    status_requset: api.status_requset,
+    note: api.note,
+    file: api.file,
+    created_at: api.created_at,
+    updated_at: api.updated_at,
+  };
+}
+
+export function mapApiFormRequserToFormRequser(api: ApiFormRequser): FormRequser {
+  return {
+    id: api.id,
+    name: api.name,
+    requser_id: api.requser,
+    gender: api.gender,
+    type_form: api.type_form,
+    parent_id: api.parent,
+    birth_year: api.birth_year,
+    death_year: api.death_year,
+    birth_place_id: api.birth_place,
+    death_place_id: api.death_place,
+    name_birth_place: api.name_birth_place,
+    name_place_place: api.name_place_place,
+    name_death_place: api.name_death_place,
+    type_mother: api.type_mother,
+    name_mother: api.name_mother,
+    note: api.note,
+    created_at: api.created_at,
+    updated_at: api.updated_at,
+  };
 }

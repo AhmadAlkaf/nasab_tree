@@ -1,9 +1,13 @@
 import {
   Person, Wife, Source, City, ApiPerson,
-  PersonFormData, WifeFormData, SourceFormData,
+  PersonFormData, WifeFormData, SourceFormData, RequestFormData,
   ApiResponse, PaginatedResponse, SearchResult,
   DashboardData, FullPersonTreeResponse,
   mapApiPersonToPerson, mapApiWifeToWife, mapApiSourceToSource,
+  Requser, ApiRequser, mapApiRequserToRequser,
+  StatusRequserDcm, ApiStatusRequserDcm, mapApiStatusRequserDcmToStatus,
+  FormRequser, ApiFormRequser, mapApiFormRequserToFormRequser,
+  StatusRequset, TypeForm, Gender, TypeMother,
 } from '@/types';
 
 // ===== Base URL (proxied through Next.js rewrites) =====
@@ -784,6 +788,354 @@ export async function getStats(): Promise<ApiResponse<{
         totalSources: dashboard.count_source,
         generations: dashboard.max_level,
       },
+    };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+// ===== Request API =====
+
+export async function getRequsersPage(
+  page: number,
+  pageSize: number,
+  filters: { search?: string; type_requser?: string; status?: string } = {}
+): Promise<ApiResponse<PaginatedResponse<Requser>>> {
+  try {
+    const params = new URLSearchParams({ page: page.toString(), page_size: pageSize.toString() });
+    if (filters.search?.trim()) params.set('search', filters.search.trim());
+    if (filters.type_requser) params.set('type_requser', filters.type_requser);
+    if (filters.status) params.set('status_requset', filters.status);
+
+    const rawResponse = (await apiFetch(`/request/requser/?${params.toString()}`)) as Record<string, unknown> | ApiRequser[];
+
+    let responseData: unknown = rawResponse;
+    if (rawResponse && typeof rawResponse === 'object' && !Array.isArray(rawResponse)) {
+      if ('success' in rawResponse && 'data' in rawResponse) {
+        responseData = rawResponse.data;
+      }
+    }
+
+    let results: ApiRequser[];
+    let count: number;
+    let next: string | number | null = null;
+    let previous: string | number | null = null;
+
+    if (Array.isArray(responseData)) {
+      results = responseData;
+      count = responseData.length;
+    } else {
+      const paged = responseData as PaginatedResponse<ApiRequser>;
+      results = paged.results || [];
+      count = paged.count || 0;
+      next = paged.next;
+      previous = paged.previous;
+    }
+
+    return {
+      success: true,
+      data: {
+        count,
+        next,
+        previous,
+        results: results.map(mapApiRequserToRequser),
+      },
+    };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export async function getRequser(id: number): Promise<ApiResponse<Requser>> {
+  try {
+    const apiRequser = await apiFetch<ApiRequser>(`/request/requser/${id}/`);
+    return { success: true, data: mapApiRequserToRequser(apiRequser) };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export async function createRequser(data: RequestFormData): Promise<ApiResponse<Requser>> {
+  try {
+    const formData = new FormData();
+    formData.append('type_requser', data.type_requser.toString());
+    formData.append('full_name', data.full_name);
+    formData.append('name_fiamy', data.name_fiamy);
+    formData.append('name_thigh', data.name_thigh);
+    formData.append('home', data.home);
+    formData.append('type_document', data.type_document.toString());
+    formData.append('number_document', data.number_document);
+    formData.append('language', data.language);
+    if (data.name_place) formData.append('name_place', data.name_place);
+    if (data.place !== null) formData.append('place', data.place.toString());
+    if (data.phone) formData.append('phone', data.phone);
+    if (data.phone_whatapp) formData.append('phone_whatapp', data.phone_whatapp);
+    if (data.signature) formData.append('signature', data.signature);
+    if (data.image_document) formData.append('image_document', data.image_document);
+
+    const apiRequser = await apiFetch<ApiRequser>('/request/requser/', {
+      method: 'POST',
+      body: formData as unknown as string,
+    });
+    return { success: true, data: mapApiRequserToRequser(apiRequser) };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export async function getStatusesByRequser(requserId: number): Promise<ApiResponse<StatusRequserDcm[]>> {
+  try {
+    const rawResponse = await apiFetch(`/request/status_requset/?requser=${requserId}`) as Record<string, unknown> | ApiStatusRequserDcm[];
+
+    let responseData: unknown = rawResponse;
+    if (rawResponse && typeof rawResponse === 'object' && !Array.isArray(rawResponse)) {
+      if ('success' in rawResponse && 'data' in rawResponse) {
+        responseData = rawResponse.data;
+      }
+    }
+
+    let results: ApiStatusRequserDcm[];
+    if (Array.isArray(responseData)) {
+      results = responseData;
+    } else {
+      const paged = responseData as { results?: ApiStatusRequserDcm[] };
+      results = paged.results || [];
+    }
+
+    return {
+      success: true,
+      data: results.map(mapApiStatusRequserDcmToStatus),
+    };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export async function getFormRequsersByRequser(requserId: number): Promise<ApiResponse<FormRequser[]>> {
+  try {
+    const rawResponse = await apiFetch(`/request/form_requser/?requser=${requserId}`) as Record<string, unknown> | ApiFormRequser[];
+
+    let responseData: unknown = rawResponse;
+    if (rawResponse && typeof rawResponse === 'object' && !Array.isArray(rawResponse)) {
+      if ('success' in rawResponse && 'data' in rawResponse) {
+        responseData = rawResponse.data;
+      }
+    }
+
+    let results: ApiFormRequser[];
+    if (Array.isArray(responseData)) {
+      results = responseData;
+    } else {
+      const paged = responseData as { results?: ApiFormRequser[] };
+      results = paged.results || [];
+    }
+
+    return {
+      success: true,
+      data: results.map(mapApiFormRequserToFormRequser),
+    };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export async function createStatusRequser(data: {
+  requser: number;
+  status_requset: StatusRequset;
+  note?: string;
+  file?: File | null;
+}): Promise<ApiResponse<StatusRequserDcm>> {
+  try {
+    const formData = new FormData();
+    formData.append('requser', data.requser.toString());
+    formData.append('status_requset', data.status_requset.toString());
+    if (data.note) formData.append('note', data.note);
+    if (data.file) formData.append('file', data.file);
+
+    const apiStatus = await apiFetch<ApiStatusRequserDcm>('/request/status_requset/', {
+      method: 'POST',
+      body: formData as unknown as string,
+    });
+    return { success: true, data: mapApiStatusRequserDcmToStatus(apiStatus) };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export async function createFormRequser(data: {
+  requser: number;
+  name: string;
+  gender: Gender;
+  type_form: TypeForm;
+  parent?: number | null;
+  birth_year?: number | null;
+  death_year?: number | null;
+  birth_place?: number | null;
+  death_place?: number | null;
+  name_birth_place?: string;
+  name_place_place?: string;
+  name_death_place?: string;
+  type_mother?: TypeMother;
+  name_mother?: string;
+  note?: string;
+}): Promise<ApiResponse<FormRequser>> {
+  try {
+    const jsonData: Record<string, unknown> = {
+      requser: data.requser,
+      name: data.name,
+      gender: data.gender,
+      type_form: data.type_form,
+    };
+    if (data.parent !== undefined && data.parent !== null) jsonData.parent = data.parent;
+    if (data.birth_year !== undefined && data.birth_year !== null) jsonData.birth_year = data.birth_year;
+    if (data.death_year !== undefined && data.death_year !== null) jsonData.death_year = data.death_year;
+    if (data.birth_place !== undefined && data.birth_place !== null) jsonData.birth_place = data.birth_place;
+    if (data.death_place !== undefined && data.death_place !== null) jsonData.death_place = data.death_place;
+    if (data.name_birth_place) jsonData.name_birth_place = data.name_birth_place;
+    if (data.name_place_place) jsonData.name_place_place = data.name_place_place;
+    if (data.name_death_place) jsonData.name_death_place = data.name_death_place;
+    if (data.type_mother !== undefined) jsonData.type_mother = data.type_mother;
+    if (data.name_mother) jsonData.name_mother = data.name_mother;
+    if (data.note) jsonData.note = data.note;
+
+    const apiForm = await apiFetch<ApiFormRequser>('/request/form_requser/', {
+      method: 'POST',
+      body: JSON.stringify(jsonData),
+    });
+    return { success: true, data: mapApiFormRequserToFormRequser(apiForm) };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+// ===== All Statuses =====
+
+export async function getAllStatusesPage(
+  page: number,
+  pageSize: number,
+  filters: { search?: string; status?: string } = {}
+): Promise<ApiResponse<PaginatedResponse<StatusRequserDcm & { requser_name?: string }>>> {
+  try {
+    const params = new URLSearchParams({ page: page.toString(), page_size: pageSize.toString() });
+    if (filters.search?.trim()) params.set('search', filters.search.trim());
+    if (filters.status) params.set('status_requset', filters.status);
+
+    const rawResponse = (await apiFetch(`/request/status_requset/?${params.toString()}`)) as Record<string, unknown> | ApiStatusRequserDcm[];
+
+    let responseData: unknown = rawResponse;
+    if (rawResponse && typeof rawResponse === 'object' && !Array.isArray(rawResponse)) {
+      if ('success' in rawResponse && 'data' in rawResponse) {
+        responseData = rawResponse.data;
+      }
+    }
+
+    let results: ApiStatusRequserDcm[];
+    let count: number;
+    let next: string | number | null = null;
+    let previous: string | number | null = null;
+
+    if (Array.isArray(responseData)) {
+      results = responseData;
+      count = responseData.length;
+    } else {
+      const paged = responseData as PaginatedResponse<ApiStatusRequserDcm>;
+      results = paged.results || [];
+      count = paged.count || 0;
+      next = paged.next;
+      previous = paged.previous;
+    }
+
+    const mappedResults = results.map(mapApiStatusRequserDcmToStatus);
+
+    // Try to get requser names
+    const requserIds = [...new Set(results.map(r => r.requser))];
+    const requserNames = new Map<number, string>();
+    for (const id of requserIds) {
+      try {
+        const reqRes = await getRequser(id);
+        if (reqRes.success && reqRes.data) {
+          requserNames.set(id, reqRes.data.full_name);
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    const enrichedResults = mappedResults.map(s => ({
+      ...s,
+      requser_name: requserNames.get(s.requser_id) || `طلب #${s.requser_id}`,
+    }));
+
+    return {
+      success: true,
+      data: { count, next, previous, results: enrichedResults },
+    };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+// ===== All Form Requsers =====
+
+export async function getAllFormRequsersPage(
+  page: number,
+  pageSize: number,
+  filters: { search?: string; type_form?: string } = {}
+): Promise<ApiResponse<PaginatedResponse<FormRequser & { requser_name?: string }>>> {
+  try {
+    const params = new URLSearchParams({ page: page.toString(), page_size: pageSize.toString() });
+    if (filters.search?.trim()) params.set('search', filters.search.trim());
+    if (filters.type_form) params.set('type_form', filters.type_form);
+
+    const rawResponse = (await apiFetch(`/request/form_requser/?${params.toString()}`)) as Record<string, unknown> | ApiFormRequser[];
+
+    let responseData: unknown = rawResponse;
+    if (rawResponse && typeof rawResponse === 'object' && !Array.isArray(rawResponse)) {
+      if ('success' in rawResponse && 'data' in rawResponse) {
+        responseData = rawResponse.data;
+      }
+    }
+
+    let results: ApiFormRequser[];
+    let count: number;
+    let next: string | number | null = null;
+    let previous: string | number | null = null;
+
+    if (Array.isArray(responseData)) {
+      results = responseData;
+      count = responseData.length;
+    } else {
+      const paged = responseData as PaginatedResponse<ApiFormRequser>;
+      results = paged.results || [];
+      count = paged.count || 0;
+      next = paged.next;
+      previous = paged.previous;
+    }
+
+    const mappedResults = results.map(mapApiFormRequserToFormRequser);
+
+    // Try to get requser names
+    const requserIds = [...new Set(results.map(r => r.requser))];
+    const requserNames = new Map<number, string>();
+    for (const id of requserIds) {
+      try {
+        const reqRes = await getRequser(id);
+        if (reqRes.success && reqRes.data) {
+          requserNames.set(id, reqRes.data.full_name);
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    const enrichedResults = mappedResults.map(f => ({
+      ...f,
+      requser_name: requserNames.get(f.requser_id) || `طلب #${f.requser_id}`,
+    }));
+
+    return {
+      success: true,
+      data: { count, next, previous, results: enrichedResults },
     };
   } catch (err) {
     return { success: false, error: (err as Error).message };

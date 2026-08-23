@@ -78,8 +78,8 @@ export default function PersonsPage() {
     <div>
       <div className="page-header">
         <div>
-          <h1 className="page-title">الأشخاص</h1>
-          <div className="page-subtitle">سجل جميع الأفراد في الشجرة النسبية</div>
+          <h1 className="page-title">إدارة الإثبات</h1>
+          <div className="page-subtitle">إدارة بحث وإثبات النسب</div>
         </div>
         <div className="page-header-right">
           <Link href="/persons/new" className="btn btn-primary">

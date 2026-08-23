@@ -8,17 +8,51 @@ import {
   Users,
   GitBranch,
   UserPlus,
+  ClipboardList,
+  Plus,
+  Clock,
+  FileText,
   Menu,
   X,
   Sun,
   Moon
 } from 'lucide-react';
 
-const navItems = [
-  { href: '/', label: 'الرئيسية', icon: Home },
-  { href: '/persons', label: 'الأشخاص', icon: Users },
-  { href: '/tree', label: 'الشجرة', icon: GitBranch },
-  { href: '/persons/new', label: 'إضافة شخص', icon: UserPlus },
+interface NavItem {
+  href: string;
+  label: string;
+  icon: typeof Home;
+}
+
+interface NavSection {
+  title: string;
+  items: NavItem[];
+}
+
+const navSections: NavSection[] = [
+  {
+    title: 'القائمة الرئيسية',
+    items: [
+      { href: '/', label: 'الرئيسية', icon: Home },
+    ],
+  },
+  {
+    title: 'إدارة الإثبات',
+    items: [
+      { href: '/persons', label: 'الأشخاص', icon: Users },
+      { href: '/persons/new', label: 'إضافة شخص', icon: UserPlus },
+      { href: '/tree', label: 'الشجرة', icon: GitBranch },
+    ],
+  },
+  {
+    title: 'الطلبات',
+    items: [
+      { href: '/requests', label: 'قائمة الطلبات', icon: ClipboardList },
+      { href: '/requests/new', label: 'إضافة طلب', icon: Plus },
+      { href: '/requests/statuses', label: 'حالات الطلبات', icon: Clock },
+      { href: '/requests/forms', label: 'استمارات الطلبات', icon: FileText },
+    ],
+  },
 ];
 
 export default function Sidebar() {
@@ -45,28 +79,32 @@ export default function Sidebar() {
         </div>
 
         <nav className="sidebar-nav">
-          <div className="nav-section-title">القائمة الرئيسية</div>
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive =
-              item.href === '/'
-                ? pathname === '/'
-                : pathname.startsWith(item.href);
+          {navSections.map((section, sectionIndex) => (
+            <div key={sectionIndex}>
+              <div className="nav-section-title">{section.title}</div>
+              {section.items.map((item) => {
+                const Icon = item.icon;
+                const isActive =
+                  item.href === '/'
+                    ? pathname === '/'
+                    : pathname.startsWith(item.href);
 
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`nav-link ${isActive ? 'active' : ''}`}
-                onClick={() => {
-                  if (window.innerWidth < 768) toggleSidebar();
-                }}
-              >
-                <Icon size={18} />
-                {item.label}
-              </Link>
-            );
-          })}
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`nav-link ${isActive ? 'active' : ''}`}
+                    onClick={() => {
+                      if (window.innerWidth < 768) toggleSidebar();
+                    }}
+                  >
+                    <Icon size={18} />
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </div>
+          ))}
         </nav>
 
         <div style={{ padding: '16px', borderTop: '1px solid var(--border-subtle)' }}>
