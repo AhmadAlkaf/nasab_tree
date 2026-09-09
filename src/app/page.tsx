@@ -3,10 +3,10 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { getStats, getRequsersPage } from '@/lib/api';
+import { getStats, getRequsersPage, getAllFormRequsersPage } from '@/lib/api';
 import {
   Users, UserPlus, GitBranch, Search, Book, Heart,
-  ClipboardList, Plus, ChevronLeft, User, Calendar, MapPin
+  ClipboardList, Plus, ChevronLeft, User, Calendar, MapPin, FileText
 } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
 import { Requser, TypeRequsetLabels } from '@/types';
@@ -22,6 +22,9 @@ export default function Dashboard() {
   });
   const [recentRequests, setRecentRequests] = useState<Requser[]>([]);
   const [totalRequests, setTotalRequests] = useState(0);
+  const [countRequestType, setCountRequestType] = useState(0);
+  const [countDescendingType, setCountDescendingType] = useState(0);
+  const [countForms, setCountForms] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const { refreshKey } = useAppStore();
   const router = useRouter();
@@ -29,9 +32,12 @@ export default function Dashboard() {
   useEffect(() => {
     const fetchStats = async () => {
       setIsLoading(true);
-      const [statsRes, requestsRes] = await Promise.all([
+      const [statsRes, requestsRes, requestTypeRes, descendingRes, formsRes] = await Promise.all([
         getStats(),
         getRequsersPage(1, 5, {}),
+        getRequsersPage(1, 1, { type_requser: '1' }),
+        getRequsersPage(1, 1, { type_requser: '2' }),
+        getAllFormRequsersPage(1, 1, {}),
       ]);
 
       if (statsRes.success && statsRes.data) {
@@ -41,6 +47,18 @@ export default function Dashboard() {
       if (requestsRes.success && requestsRes.data) {
         setRecentRequests(requestsRes.data.results);
         setTotalRequests(requestsRes.data.count);
+      }
+
+      if (requestTypeRes.success && requestTypeRes.data) {
+        setCountRequestType(requestTypeRes.data.count);
+      }
+
+      if (descendingRes.success && descendingRes.data) {
+        setCountDescendingType(descendingRes.data.count);
+      }
+
+      if (formsRes.success && formsRes.data) {
+        setCountForms(formsRes.data.count);
       }
 
       setIsLoading(false);
@@ -115,6 +133,24 @@ export default function Dashboard() {
               <div className="stat-icon blue"><ClipboardList size={22} /></div>
               <div className="stat-value">{totalRequests}</div>
               <div className="stat-label">إجمالي الطلبات</div>
+            </div>
+
+            <div className="stat-card gold">
+              <div className="stat-icon gold"><ClipboardList size={22} /></div>
+              <div className="stat-value">{countRequestType}</div>
+              <div className="stat-label">&quot;طلبات&quot; نوع طلب</div>
+            </div>
+
+            <div className="stat-card pink">
+              <div className="stat-icon pink"><ClipboardList size={22} /></div>
+              <div className="stat-value">{countDescendingType}</div>
+              <div className="stat-label">&quot;نزول&quot; نوع الطلبات</div>
+            </div>
+
+            <div className="stat-card emerald">
+              <div className="stat-icon emerald"><FileText size={22} /></div>
+              <div className="stat-value">{countForms}</div>
+              <div className="stat-label">الاستمارات (الأشخاص بالطلبات)</div>
             </div>
           </div>
 

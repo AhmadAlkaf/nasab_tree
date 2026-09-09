@@ -7,19 +7,22 @@ import {
   Background,
   ReactFlowProvider,
   Node,
+  NodeProps,
   Edge,
   MarkerType,
+  Handle,
+  Position,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import dagre from 'dagre';
 import { FormRequser, TypeFormLabels, GenderLabels } from '@/types';
-import { User } from 'lucide-react';
+import { User, Edit } from 'lucide-react';
 
 const dagreGraph = new dagre.graphlib.Graph();
 dagreGraph.setDefaultEdgeLabel(() => ({}));
 
 const nodeWidth = 200;
-const nodeHeight = 100;
+const nodeHeight = 110;
 
 const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'TB') => {
   dagreGraph.setGraph({ rankdir: direction, nodesep: 60, edgesep: 30, ranksep: 80 });
@@ -48,13 +51,37 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'TB') => 
   return { nodes: layoutedNodes, edges };
 };
 
-function FormRequserNode({ data }: { data: { form: FormRequser } }) {
-  const { form } = data;
+type FormRequserNodeData = {
+  form: FormRequser;
+  onEdit?: (form: FormRequser) => void;
+  onAddChild?: (form: FormRequser) => void;
+};
+
+function FormRequserNode({ data }: NodeProps<Node<FormRequserNodeData>>) {
+  const { form, onEdit, onAddChild } = data;
   const isMale = form.gender === 'M';
   const iconColor = isMale ? 'var(--blue-400)' : 'var(--pink-400)';
 
   return (
-    <div className={`tree-node ${isMale ? 'male' : 'female'}`}>
+    <>
+      <Handle
+        type="target"
+        position={Position.Top}
+        style={{ background: 'var(--text-muted)', width: 8, height: 8, border: 'none' }}
+      />
+      <div className={`tree-node ${isMale ? 'male' : 'female'}`} style={{ position: 'relative' }}>
+      {onEdit && (
+        <button
+          className="form-node-edit-btn"
+          onClick={(e) => {
+            e.stopPropagation();
+            onEdit(form);
+          }}
+          title="تعديل سريع"
+        >
+          <Edit size={12} />
+        </button>
+      )}
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 6 }}>
         <div
           style={{
@@ -83,7 +110,26 @@ function FormRequserNode({ data }: { data: { form: FormRequser } }) {
           {form.birth_year || '?'} - {form.death_year || '?'}
         </div>
       )}
+
+      {onAddChild && (
+        <button
+          className="form-node-add-btn"
+          onClick={(e) => {
+            e.stopPropagation();
+            onAddChild(form);
+          }}
+          title="إضافة ابن"
+        >
+          +
+        </button>
+      )}
     </div>
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        style={{ background: 'var(--text-muted)', width: 8, height: 8, border: 'none', bottom: -14 }}
+      />
+    </>
   );
 }
 
@@ -93,9 +139,11 @@ const nodeTypes = {
 
 interface FormRequserTreeProps {
   formRequsers: FormRequser[];
+  onNodeClick?: (form: FormRequser) => void;
+  onAddChild?: (form: FormRequser) => void;
 }
 
-function FormRequserTreeInner({ formRequsers }: FormRequserTreeProps) {
+function FormRequserTreeInner({ formRequsers, onNodeClick, onAddChild }: FormRequserTreeProps) {
   const { nodes, edges } = useMemo(() => {
     if (!formRequsers.length) return { nodes: [], edges: [] };
 
@@ -106,7 +154,7 @@ function FormRequserTreeInner({ formRequsers }: FormRequserTreeProps) {
       id: form.id.toString(),
       type: 'formRequser',
       position: { x: 0, y: 0 },
-      data: { form },
+      data: { form, onEdit: onNodeClick, onAddChild },
     }));
 
     const initialEdges: Edge[] = [];
@@ -128,7 +176,7 @@ function FormRequserTreeInner({ formRequsers }: FormRequserTreeProps) {
     });
 
     return getLayoutedElements(initialNodes, initialEdges, 'TB');
-  }, [formRequsers]);
+  }, [formRequsers, onNodeClick, onAddChild]);
 
   if (!formRequsers.length) {
     return (
@@ -139,21 +187,25 @@ function FormRequserTreeInner({ formRequsers }: FormRequserTreeProps) {
   }
 
   return (
-    <div style={{ height: 400 }}>
+    <div className="form-requser-tree" style={{ height: 520 }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
         fitView
-        fitViewOptions={{ padding: 0.3 }}
-        minZoom={0.3}
-        maxZoom={1.5}
+        fitViewOptions={{ padding: 0.2 }}
+        minZoom={0.2}
+        maxZoom={2}
         nodesDraggable={false}
         nodesConnectable={false}
-        elementsSelectable={false}
+        elementsSelectable
+        onNodeClick={(_, node) => {
+          const form = (node.data as FormRequserNodeData).form;
+          onNodeClick?.(form);
+        }}
       >
         <Background color="var(--border-strong)" gap={16} />
-        <Controls />
+        <Controls showInteractive={false} position="bottom-right" />
       </ReactFlow>
     </div>
   );

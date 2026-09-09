@@ -170,13 +170,14 @@ export async function getPersons(): Promise<ApiResponse<Person[]>> {
 export async function getPersonsPage(
   page: number,
   pageSize: number,
-  filters: { search?: string; gender?: string; type?: string } = {}
+  filters: { search?: string; gender?: string; type?: string; level?: string } = {}
 ): Promise<ApiResponse<PaginatedResponse<Person>>> {
   try {
     const params = new URLSearchParams({ page: page.toString(), page_size: pageSize.toString() });
     if (filters.search?.trim()) params.set('search', filters.search.trim());
     if (filters.gender) params.set('gender', filters.gender);
     if (filters.type) params.set('type_person', filters.type);
+    if (filters.level) params.set('level', filters.level);
 
     const pageData = await fetchApiPersonsPage(`/persons/?${params.toString()}`);
     return {
@@ -1000,6 +1001,60 @@ export async function createFormRequser(data: {
 
     const apiForm = await apiFetch<ApiFormRequser>('/request/form_requser/', {
       method: 'POST',
+      body: JSON.stringify(jsonData),
+    });
+    return { success: true, data: mapApiFormRequserToFormRequser(apiForm) };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export async function updateFormRequser(
+  id: number,
+  data: {
+    requser: number;
+    name: string;
+    gender: Gender;
+    type_form: TypeForm;
+    parent?: number | null;
+    birth_year?: number | null;
+    death_year?: number | null;
+    birth_place?: number | null;
+    death_place?: number | null;
+    name_birth_place?: string;
+    name_place_place?: string;
+    name_death_place?: string;
+    type_mother?: TypeMother;
+    name_mother?: string;
+    note?: string;
+  }
+): Promise<ApiResponse<FormRequser>> {
+  try {
+    const jsonData: Record<string, unknown> = {
+      requser: data.requser,
+      name: data.name,
+      gender: data.gender,
+      type_form: data.type_form,
+    };
+    if (data.parent !== undefined && data.parent !== null) jsonData.parent = data.parent;
+    else jsonData.parent = null;
+    if (data.birth_year !== undefined && data.birth_year !== null) jsonData.birth_year = data.birth_year;
+    else jsonData.birth_year = null;
+    if (data.death_year !== undefined && data.death_year !== null) jsonData.death_year = data.death_year;
+    else jsonData.death_year = null;
+    if (data.birth_place !== undefined && data.birth_place !== null) jsonData.birth_place = data.birth_place;
+    else jsonData.birth_place = null;
+    if (data.death_place !== undefined && data.death_place !== null) jsonData.death_place = data.death_place;
+    else jsonData.death_place = null;
+    jsonData.name_birth_place = data.name_birth_place || '';
+    jsonData.name_place_place = data.name_place_place || '';
+    jsonData.name_death_place = data.name_death_place || '';
+    jsonData.type_mother = data.type_mother !== undefined ? data.type_mother : TypeMother.unknown;
+    jsonData.name_mother = data.name_mother || '';
+    jsonData.note = data.note || '';
+
+    const apiForm = await apiFetch<ApiFormRequser>(`/request/form_requser/${id}/`, {
+      method: 'PATCH',
       body: JSON.stringify(jsonData),
     });
     return { success: true, data: mapApiFormRequserToFormRequser(apiForm) };

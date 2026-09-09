@@ -17,7 +17,7 @@ import StatusForm from '@/components/forms/StatusForm';
 import FormRequserForm from '@/components/forms/FormRequserForm';
 import Modal from '@/components/ui/Modal';
 import {
-  User, FileText, MapPin, Calendar, Phone, Download, Clock, GitBranch, ChevronLeft, Plus
+  User, FileText, MapPin, Calendar, Phone, Download, Clock, GitBranch, ChevronLeft, Plus, UserPlus
 } from 'lucide-react';
 
 export default function RequestDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -31,9 +31,43 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
 
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [isFormRequserModalOpen, setIsFormRequserModalOpen] = useState(false);
+  const [isEditFormModalOpen, setIsEditFormModalOpen] = useState(false);
+  const [isAddChildModalOpen, setIsAddChildModalOpen] = useState(false);
+  const [editingForm, setEditingForm] = useState<FormRequser | null>(null);
+  const [childParent, setChildParent] = useState<FormRequser | null>(null);
 
   const { refreshKey, addToast } = useAppStore();
   const router = useRouter();
+
+  const handleNodeClick = (form: FormRequser) => {
+    setEditingForm(form);
+    setIsEditFormModalOpen(true);
+  };
+
+  const handleAddChild = (form: FormRequser) => {
+    setChildParent(form);
+    setIsAddChildModalOpen(true);
+  };
+
+  const handleDownload = async (url: string, label: string) => {
+    if (!url) return;
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error();
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = `${label}_${Date.now()}.${blob.type.split('/')[1] || 'file'}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(objectUrl);
+      addToast({ type: 'success', message: `تم تحميل ${label}` });
+    } catch {
+      addToast({ type: 'error', message: `تعذر تحميل ${label} - الملف غير موجود` });
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -203,7 +237,7 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
                   <div className="list-item-subtitle">{requser.number_document}</div>
                 </div>
                 {requser.image_document && (
-                  <button className="btn btn-ghost btn-sm">
+                  <button className="btn btn-ghost btn-sm" onClick={() => handleDownload(requser.image_document, 'الوثيقة')}>
                     <Download size={14} />
                   </button>
                 )}
@@ -216,7 +250,7 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
                   <div className="list-item-content">
                     <div className="list-item-title">التوقيع</div>
                   </div>
-                  <button className="btn btn-ghost btn-sm">
+                  <button className="btn btn-ghost btn-sm" onClick={() => handleDownload(requser.signature, 'التوقيع')}>
                     <Download size={14} />
                   </button>
                 </div>
@@ -227,29 +261,6 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
 
         {/* العمود الجانبي */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-          {/* شجرة النموذج */}
-          <div className="card">
-            <div className="card-header">
-              <div className="card-header-title">
-                <GitBranch size={18} style={{ color: 'var(--emerald-400)' }} />
-                شجرة النموذج ({formRequsers.length})
-              </div>
-              <button className="btn btn-ghost btn-sm" onClick={() => setIsFormRequserModalOpen(true)}>
-                <Plus size={14} />
-                إضافة شخص
-              </button>
-            </div>
-            <div className="card-body" style={{ background: 'var(--bg-secondary)', padding: 0, minHeight: 300 }}>
-              {formRequsers.length === 0 ? (
-                <div className="empty-state" style={{ padding: '30px 20px' }}>
-                  <div className="empty-state-text" style={{ marginBottom: 0 }}>لا توجد نماذج مسجلة</div>
-                </div>
-              ) : (
-                <FormRequserTree formRequsers={formRequsers} />
-              )}
-            </div>
-          </div>
-
           {/* سجل الحالات */}
           <div className="card">
             <div className="card-header">
@@ -291,8 +302,16 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
                             {status.note}
                           </div>
                         )}
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                          {new Date(status.created_at).toLocaleDateString('ar-SA')}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                            {new Date(status.created_at).toLocaleDateString('ar-SA')}
+                          </div>
+                          {status.file && (
+                            <button className="btn btn-link btn-sm" onClick={() => handleDownload(status.file!, 'ملف الحالة')}>
+                              <Download size={12} />
+                              تحميل الملف
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -301,6 +320,29 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
               )}
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* شجرة النموذج - بعرض كامل */}
+      <div className="card" style={{ marginTop: 24 }}>
+        <div className="card-header">
+          <div className="card-header-title">
+            <GitBranch size={18} style={{ color: 'var(--emerald-400)' }} />
+            شجرة النموذج ({formRequsers.length})
+          </div>
+          <button className="btn btn-ghost btn-sm" onClick={() => setIsFormRequserModalOpen(true)}>
+            <Plus size={14} />
+            إضافة شخص
+          </button>
+        </div>
+        <div className="card-body" style={{ background: 'var(--bg-secondary)', padding: 0, minHeight: 300 }}>
+          {formRequsers.length === 0 ? (
+            <div className="empty-state" style={{ padding: '30px 20px' }}>
+              <div className="empty-state-text" style={{ marginBottom: 0 }}>لا توجد نماذج مسجلة</div>
+            </div>
+          ) : (
+            <FormRequserTree formRequsers={formRequsers} onNodeClick={(form) => handleNodeClick(form)} onAddChild={(form) => handleAddChild(form)} />
+          )}
         </div>
       </div>
 
@@ -328,6 +370,38 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
         <FormRequserForm
           requserId={requestId}
           onSuccess={() => setIsFormRequserModalOpen(false)}
+        />
+      </Modal>
+
+      {/* نافذة تعديل شخص */}
+      <Modal
+        isOpen={isEditFormModalOpen}
+        onClose={() => { setIsEditFormModalOpen(false); setEditingForm(null); }}
+        title={`تعديل: ${editingForm?.name || ''}`}
+        size="lg"
+        icon={<User size={20} style={{ color: 'var(--emerald-400)' }} />}
+      >
+        {editingForm && (
+          <FormRequserForm
+            requserId={requestId}
+            form={editingForm}
+            onSuccess={() => { setIsEditFormModalOpen(false); setEditingForm(null); }}
+          />
+        )}
+      </Modal>
+
+      {/* نافذة إضافة ابن */}
+      <Modal
+        isOpen={isAddChildModalOpen}
+        onClose={() => { setIsAddChildModalOpen(false); setChildParent(null); }}
+        title={`إضافة ابن لـ: ${childParent?.name || ''}`}
+        size="lg"
+        icon={<UserPlus size={20} style={{ color: 'var(--gold-400)' }} />}
+      >
+        <FormRequserForm
+          requserId={requestId}
+          defaultParentId={childParent?.id}
+          onSuccess={() => { setIsAddChildModalOpen(false); setChildParent(null); }}
         />
       </Modal>
     </div>

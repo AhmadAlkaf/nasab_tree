@@ -1522,6 +1522,83 @@ a {
   display: none !important;
 }
 
+/* ===== Form Request Tree ===== */
+.form-requser-tree .react-flow__controls {
+  display: flex !important;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-card);
+}
+
+.form-requser-tree .react-flow__controls-button {
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+}
+
+.form-requser-tree .react-flow__controls-button:hover {
+  background: var(--bg-elevated);
+  color: var(--gold-400);
+}
+
+.form-requser-tree .react-flow__controls-button svg {
+  fill: currentColor;
+}
+
+.form-node-edit-btn {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 5;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: rgba(212, 168, 83, 0.15);
+  color: var(--gold-400);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  opacity: 0.7;
+}
+
+.form-node-edit-btn:hover {
+  background: var(--gold-400);
+  color: var(--bg-card);
+  opacity: 1;
+}
+
+.form-node-add-btn {
+  position: absolute;
+  bottom: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--bg-secondary);
+  border: 2px solid var(--border-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  z-index: 10;
+  font-size: 16px;
+  line-height: 1;
+  transition: all var(--transition-fast);
+}
+
+.form-node-add-btn:hover {
+  background: var(--gold-400);
+  border-color: var(--gold-400);
+  color: var(--bg-card);
+}
+
 /* ===== Sidebar Toggle ===== */
 .sidebar-toggle {
   position: fixed;

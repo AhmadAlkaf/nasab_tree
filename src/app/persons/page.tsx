@@ -35,6 +35,7 @@ export default function PersonsPage() {
   const [query, setQuery] = useState('');
   const [filterGender, setFilterGender] = useState<string>('');
   const [filterType, setFilterType] = useState<string>('');
+  const [filterLevel, setFilterLevel] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
@@ -49,6 +50,7 @@ export default function PersonsPage() {
         search: query,
         gender: filterGender,
         type: filterType,
+        level: filterLevel,
       });
       if (res.success && res.data) {
         setPersons(res.data.results);
@@ -59,7 +61,7 @@ export default function PersonsPage() {
 
     const delaySearch = setTimeout(fetchPersons, query.trim() ? 300 : 0);
     return () => clearTimeout(delaySearch);
-  }, [refreshKey, page, pageSize, query, filterGender, filterType]);
+  }, [refreshKey, page, pageSize, query, filterGender, filterType, filterLevel]);
 
   const changeFilter = (setter: (value: string) => void, value: string) => {
     setter(value);
@@ -134,6 +136,15 @@ export default function PersonsPage() {
                 <option key={key} value={key}>{label}</option>
               ))}
             </select>
+            <input
+              type="number"
+              min={0}
+              className="form-input"
+              style={{ width: 120 }}
+              placeholder="المستوى"
+              value={filterLevel}
+              onChange={(e) => changeFilter(setFilterLevel, e.target.value)}
+            />
           </div>
         </div>
         
@@ -145,6 +156,7 @@ export default function PersonsPage() {
                 <th>اللقب/الكنية</th>
                 <th>الجنس</th>
                 <th>النوع</th>
+                <th>المستوى</th>
                 <th>سنة الميلاد</th>
                 <th>سنة الوفاة</th>
                 <th></th>
@@ -153,13 +165,13 @@ export default function PersonsPage() {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: 'center', padding: '40px 0' }}>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: '40px 0' }}>
                     <div className="loading-spinner" />
                   </td>
                 </tr>
               ) : displayedPersons.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}>
                     لا توجد نتائج مطابقة للبحث أو الفلتر
                   </td>
                 </tr>
@@ -196,6 +208,11 @@ export default function PersonsPage() {
                     <td>
                       <span className="badge muted">
                         {TypePersonLabels[person.type_person]}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="badge gold">
+                        الطبقة {person.level}
                       </span>
                     </td>
                     <td>{person.birth_year || '-'}</td>

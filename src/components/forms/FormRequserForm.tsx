@@ -9,47 +9,50 @@ import {
   TypeMother,
   TypeMotherLabels,
 } from '@/types';
-import { createFormRequser, getFormRequsersByRequser } from '@/lib/api';
+import { createFormRequser, updateFormRequser, getFormRequsersByRequser } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
 import CitySelector from './CitySelector';
 import { Save, User, Users, Heart, MapPin, Calendar, UserPlus } from 'lucide-react';
 
 interface FormRequserFormProps {
   requserId: number;
+  form?: FormRequser | null;
+  defaultParentId?: number | null;
   onSuccess?: () => void;
 }
 
-export default function FormRequserForm({ requserId, onSuccess }: FormRequserFormProps) {
-  const [name, setName] = useState('');
-  const [gender, setGender] = useState<Gender>('M');
-  const [typeForm, setTypeForm] = useState<TypeForm>(TypeForm.request);
-  const [parentId, setParentId] = useState<number | null>(null);
-  const [birthYear, setBirthYear] = useState<number | null>(null);
-  const [deathYear, setDeathYear] = useState<number | null>(null);
-  const [birthPlace, setBirthPlace] = useState<number | null>(null);
-  const [deathPlace, setDeathPlace] = useState<number | null>(null);
-  const [nameBirthPlace, setNameBirthPlace] = useState('');
-  const [namePlacePlace, setNamePlacePlace] = useState('');
-  const [nameDeathPlace, setNameDeathPlace] = useState('');
-  const [typeMother, setTypeMother] = useState<TypeMother>(TypeMother.unknown);
-  const [nameMother, setNameMother] = useState('');
-  const [note, setNote] = useState('');
+export default function FormRequserForm({ requserId, form, defaultParentId, onSuccess }: FormRequserFormProps) {
+  const [name, setName] = useState(form?.name ?? '');
+  const [gender, setGender] = useState<Gender>(form?.gender ?? 'M');
+  const [typeForm, setTypeForm] = useState<TypeForm>(form?.type_form ?? TypeForm.request);
+  const [parentId, setParentId] = useState<number | null>(form?.parent_id ?? defaultParentId ?? null);
+  const [birthYear, setBirthYear] = useState<number | null>(form?.birth_year ?? null);
+  const [deathYear, setDeathYear] = useState<number | null>(form?.death_year ?? null);
+  const [birthPlace, setBirthPlace] = useState<number | null>(form?.birth_place_id ?? null);
+  const [deathPlace, setDeathPlace] = useState<number | null>(form?.death_place_id ?? null);
+  const [nameBirthPlace, setNameBirthPlace] = useState(form?.name_birth_place || '');
+  const [namePlacePlace, setNamePlacePlace] = useState(form?.name_place_place || '');
+  const [nameDeathPlace, setNameDeathPlace] = useState(form?.name_death_place || '');
+  const [typeMother, setTypeMother] = useState<TypeMother>(form?.type_mother ?? TypeMother.unknown);
+  const [nameMother, setNameMother] = useState(form?.name_mother || '');
+  const [note, setNote] = useState(form?.note || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const [existingForms, setExistingForms] = useState<FormRequser[]>([]);
 
   const { addToast, triggerRefresh } = useAppStore();
+  const isEditing = !!form;
 
   useEffect(() => {
     const fetchExistingForms = async () => {
       const res = await getFormRequsersByRequser(requserId);
       if (res.success && res.data) {
-        setExistingForms(res.data);
+        setExistingForms(res.data.filter(f => f.id !== form?.id));
       }
     };
     fetchExistingForms();
-  }, [requserId]);
+  }, [requserId, form?.id]);
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -64,30 +67,38 @@ export default function FormRequserForm({ requserId, onSuccess }: FormRequserFor
     e.preventDefault();
     if (!validate()) return;
 
+    const payload = {
+      requser: requserId,
+      name: name.trim(),
+      gender,
+      type_form: typeForm,
+      parent: parentId,
+      birth_year: birthYear,
+      death_year: deathYear,
+      birth_place: birthPlace,
+      death_place: deathPlace,
+      name_birth_place: nameBirthPlace || undefined,
+      name_place_place: namePlacePlace || undefined,
+      name_death_place: nameDeathPlace || undefined,
+      type_mother: typeMother,
+      name_mother: nameMother || undefined,
+      note: note || undefined,
+    };
+
     setIsSubmitting(true);
     try {
-      const result = await createFormRequser({
-        requser: requserId,
-        name: name.trim(),
-        gender,
-        type_form: typeForm,
-        parent: parentId,
-        birth_year: birthYear,
-        death_year: deathYear,
-        birth_place: birthPlace,
-        death_place: deathPlace,
-        name_birth_place: nameBirthPlace || undefined,
-        name_place_place: namePlacePlace || undefined,
-        name_death_place: nameDeathPlace || undefined,
-        type_mother: typeMother,
-        name_mother: nameMother || undefined,
-        note: note || undefined,
-      });
+      const result = isEditing && form
+        ? await updateFormRequser(form.id, payload)
+        : await createFormRequser(payload);
 
       if (result.success) {
         addToast({
           type: 'success',
-          message: addSibling ? 'تم حفظ الشخص وجاهز لإضافة ابنه' : 'تم إضافة الشخص بنجاح',
+          message: isEditing
+            ? 'تم حفظ التعديل بنجاح'
+            : addSibling
+              ? 'تم حفظ الشخص وجاهز لإضافة ابنه'
+              : 'تم إضافة الشخص بنجاح',
         });
         triggerRefresh();
 
@@ -365,21 +376,23 @@ export default function FormRequserForm({ requserId, onSuccess }: FormRequserFor
           ) : (
             <Save size={16} />
           )}
-          إضافة الشخص
+          {isEditing ? 'حفظ التعديل' : 'إضافة الشخص'}
         </button>
-        <button
-          type="button"
-          className="btn btn-secondary"
-          disabled={isSubmitting}
-          onClick={(e) => handleSubmit(e, true)}
-        >
-          {isSubmitting ? (
-            <span className="loading-spinner" />
-          ) : (
-            <UserPlus size={16} />
-          )}
-          حفظ وإضافة ابن
-        </button>
+        {!isEditing && (
+          <button
+            type="button"
+            className="btn btn-secondary"
+            disabled={isSubmitting}
+            onClick={(e) => handleSubmit(e, true)}
+          >
+            {isSubmitting ? (
+              <span className="loading-spinner" />
+            ) : (
+              <UserPlus size={16} />
+            )}
+            حفظ وإضافة ابن
+          </button>
+        )}
       </div>
     </form>
   );
