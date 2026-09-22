@@ -10,14 +10,15 @@ import {
   TypeRequsetLabels,
   TypeDocumentLabels,
 } from '@/types';
-import { getRequser, getStatusesByRequser, getFormRequsersByRequser } from '@/lib/api';
+import { getRequser, deleteStatusRequser } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
 import FormRequserTree from '@/components/tree/FormRequserTree';
 import StatusForm from '@/components/forms/StatusForm';
+import RequestForm from '@/components/forms/RequestForm';
 import FormRequserForm from '@/components/forms/FormRequserForm';
 import Modal from '@/components/ui/Modal';
 import {
-  User, FileText, MapPin, Calendar, Phone, Download, Clock, GitBranch, ChevronLeft, Plus, UserPlus
+  User, FileText, MapPin, Calendar, Phone, Download, Clock, GitBranch, ChevronLeft, Plus, UserPlus, Pencil, Trash2
 } from 'lucide-react';
 
 export default function RequestDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -30,13 +31,16 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
   const [isLoading, setIsLoading] = useState(true);
 
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
+  const [isEditRequestModalOpen, setIsEditRequestModalOpen] = useState(false);
+  const [isEditStatusModalOpen, setIsEditStatusModalOpen] = useState(false);
+  const [editingStatus, setEditingStatus] = useState<StatusRequserDcm | null>(null);
   const [isFormRequserModalOpen, setIsFormRequserModalOpen] = useState(false);
   const [isEditFormModalOpen, setIsEditFormModalOpen] = useState(false);
   const [isAddChildModalOpen, setIsAddChildModalOpen] = useState(false);
   const [editingForm, setEditingForm] = useState<FormRequser | null>(null);
   const [childParent, setChildParent] = useState<FormRequser | null>(null);
 
-  const { refreshKey, addToast } = useAppStore();
+  const { refreshKey, addToast, triggerRefresh } = useAppStore();
   const router = useRouter();
 
   const handleNodeClick = (form: FormRequser) => {
@@ -69,6 +73,22 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
     }
   };
 
+  const handleEditStatus = (status: StatusRequserDcm) => {
+    setEditingStatus(status);
+    setIsEditStatusModalOpen(true);
+  };
+
+  const handleDeleteStatus = async (status: StatusRequserDcm) => {
+    if (!window.confirm('هل أنت متأكد من حذف هذه الحالة؟')) return;
+    const res = await deleteStatusRequser(status.id);
+    if (res.success) {
+      addToast({ type: 'success', message: 'تم حذف الحالة' });
+      triggerRefresh();
+    } else {
+      addToast({ type: 'error', message: res.error || 'فشل حذف الحالة' });
+    }
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
@@ -77,20 +97,13 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
       if (reqRes.success && reqRes.data) {
         setRequser(reqRes.data);
 
-        const [statusRes, formRes] = await Promise.all([
-          getStatusesByRequser(requestId),
-          getFormRequsersByRequser(requestId),
-        ]);
-
-        if (statusRes.success && statusRes.data) {
-          setStatuses(statusRes.data.sort((a, b) =>
+        setStatuses(
+          (reqRes.data.status_requser_dcm ?? []).sort((a, b) =>
             new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-          ));
-        }
+          )
+        );
 
-        if (formRes.success && formRes.data) {
-          setFormRequsers(formRes.data);
-        }
+        setFormRequsers(reqRes.data.form_requser ?? []);
       } else {
         addToast({ type: 'error', message: 'لم يتم العثور على الطلب' });
         router.push('/requests');
@@ -120,6 +133,10 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
           <h1 className="page-title">تفاصيل الطلب</h1>
         </div>
         <div className="page-header-right">
+          <button className="btn btn-secondary" onClick={() => setIsEditRequestModalOpen(true)}>
+            <Pencil size={16} />
+            تعديل الطلب
+          </button>
           <button className="btn btn-secondary" onClick={() => router.push('/requests')}>
             <ChevronLeft size={16} />
             العودة للقائمة
@@ -237,9 +254,14 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
                   <div className="list-item-subtitle">{requser.number_document}</div>
                 </div>
                 {requser.image_document && (
-                  <button className="btn btn-ghost btn-sm" onClick={() => handleDownload(requser.image_document, 'الوثيقة')}>
-                    <Download size={14} />
-                  </button>
+                  <>
+                    <button className="btn btn-ghost btn-icon" title="تحميل" onClick={() => handleDownload(requser.image_document, 'الوثيقة')}>
+                      <Download size={15} />
+                    </button>
+                    <button className="btn btn-ghost btn-icon" title="تعديل" onClick={() => setIsEditRequestModalOpen(true)}>
+                      <Pencil size={15} style={{ color: 'var(--blue-400)' }} />
+                    </button>
+                  </>
                 )}
               </div>
               {requser.signature && (
@@ -250,8 +272,11 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
                   <div className="list-item-content">
                     <div className="list-item-title">التوقيع</div>
                   </div>
-                  <button className="btn btn-ghost btn-sm" onClick={() => handleDownload(requser.signature, 'التوقيع')}>
-                    <Download size={14} />
+                  <button className="btn btn-ghost btn-icon" title="تحميل" onClick={() => handleDownload(requser.signature, 'التوقيع')}>
+                    <Download size={15} />
+                  </button>
+                  <button className="btn btn-ghost btn-icon" title="تعديل" onClick={() => setIsEditRequestModalOpen(true)}>
+                    <Pencil size={15} style={{ color: 'var(--blue-400)' }} />
                   </button>
                 </div>
               )}
@@ -293,15 +318,33 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
                           <div style={{ width: 1, flex: 1, background: 'var(--border-subtle)', marginTop: 4 }} />
                         )}
                       </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: index === 0 ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
-                          {StatusRequsetLabels[status.status_requset]}
-                        </div>
-                        {status.note && (
-                          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-                            {status.note}
+<div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: index === 0 ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
+                              {StatusRequsetLabels[status.status_requset]}
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                              <button
+                                className="btn btn-ghost btn-icon"
+                                title="تعديل"
+                                onClick={() => handleEditStatus(status)}
+                              >
+                                <Pencil size={14} style={{ color: 'var(--blue-400)' }} />
+                              </button>
+                              <button
+                                className="btn btn-ghost btn-icon"
+                                title="حذف"
+                                onClick={() => handleDeleteStatus(status)}
+                              >
+                                <Trash2 size={14} style={{ color: 'var(--red-400)' }} />
+                              </button>
+                            </div>
                           </div>
-                        )}
+                          {status.note && (
+                            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+                              {status.note}
+                            </div>
+                          )}
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
                           <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                             {new Date(status.created_at).toLocaleDateString('ar-SA')}
@@ -356,6 +399,36 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
         <StatusForm
           requserId={requestId}
           onSuccess={() => setIsStatusModalOpen(false)}
+        />
+      </Modal>
+
+      {/* نافذة تعديل حالة */}
+      <Modal
+        isOpen={isEditStatusModalOpen}
+        onClose={() => { setIsEditStatusModalOpen(false); setEditingStatus(null); }}
+        title="تعديل حالة"
+        icon={<Clock size={20} style={{ color: 'var(--amber-400)' }} />}
+      >
+        {editingStatus && (
+          <StatusForm
+            requserId={requestId}
+            existing={editingStatus}
+            onSuccess={() => { setIsEditStatusModalOpen(false); setEditingStatus(null); }}
+          />
+        )}
+      </Modal>
+
+      {/* نافذة تعديل الطلب */}
+      <Modal
+        isOpen={isEditRequestModalOpen}
+        onClose={() => setIsEditRequestModalOpen(false)}
+        title={`تعديل الطلب: ${requser.full_name}`}
+        size="lg"
+        icon={<Pencil size={20} style={{ color: 'var(--blue-400)' }} />}
+      >
+        <RequestForm
+          existing={requser}
+          onSuccess={() => setIsEditRequestModalOpen(false)}
         />
       </Modal>
 

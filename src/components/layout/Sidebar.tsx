@@ -12,10 +12,15 @@ import {
   Plus,
   Clock,
   FileText,
+  BookUser,
+  MessageSquareReply,
   Menu,
   X,
   Sun,
-  Moon
+  Moon,
+  Shield,
+  KeySquare,
+  History
 } from 'lucide-react';
 
 interface NavItem {
@@ -51,6 +56,23 @@ const navSections: NavSection[] = [
       { href: '/requests/new', label: 'إضافة طلب', icon: Plus },
       { href: '/requests/statuses', label: 'حالات الطلبات', icon: Clock },
       { href: '/requests/forms', label: 'استمارات الطلبات', icon: FileText },
+    ],
+  },
+  {
+    title: 'المعرّفين المناطق',
+    items: [
+      { href: '/references', label: 'قائمة المعرّفين', icon: BookUser },
+      { href: '/references/new', label: 'إضافة معرّف', icon: UserPlus },
+      { href: '/references/responses', label: 'الردود على الطلبات', icon: MessageSquareReply },
+    ],
+  },
+  {
+    title: 'الإدارة',
+    items: [
+      { href: '/users', label: 'المستخدمون', icon: Users },
+      { href: '/groups', label: 'المجموعات', icon: Shield },
+      { href: '/permissions', label: 'الصلاحيات', icon: KeySquare },
+      { href: '/logs', label: 'سجل الحركة', icon: History },
     ],
   },
 ];

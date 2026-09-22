@@ -1,5 +1,5 @@
 import {
-  Person, Wife, Source, City, ApiPerson,
+  Person, Wife, Source, City, ApiPerson, ApiSource,
   PersonFormData, WifeFormData, SourceFormData, RequestFormData,
   ApiResponse, PaginatedResponse, SearchResult,
   DashboardData, FullPersonTreeResponse,
@@ -7,7 +7,14 @@ import {
   Requser, ApiRequser, mapApiRequserToRequser,
   StatusRequserDcm, ApiStatusRequserDcm, mapApiStatusRequserDcmToStatus,
   FormRequser, ApiFormRequser, mapApiFormRequserToFormRequser,
-  StatusRequset, TypeForm, Gender, TypeMother,
+  StatusRequset, StatusRequsetLabels, TypeForm, Gender, TypeMother,
+  Reference, ApiReference, mapApiReferenceToReference,
+  ReferenceRequser, ApiReferenceRequser, mapApiReferenceRequserToReferenceRequser,
+  ReferenceFormData,
+  AdminUser, ApiAdminUser, UserFormData, mapApiAdminUserToAdminUser,
+  Group, ApiGroup, GroupFormData, mapApiGroupToGroup,
+  Permission, ApiPermission, PermissionFormData, mapApiPermissionToPermission,
+  LogEntry, ApiLogEntry, LogEntryFormData, LogActionFlag, mapApiLogEntryToLogEntry,
 } from '@/types';
 
 // ===== Base URL (proxied through Next.js rewrites) =====
@@ -613,9 +620,17 @@ export async function deleteWife(id: number): Promise<ApiResponse<null>> {
 
 export async function getSourcesByPerson(personId: number): Promise<ApiResponse<Source[]>> {
   try {
-    // Sources are embedded in the person response
-    const apiPerson = await apiFetch<ApiPerson>(`/persons/${personId}/`);
-    const sources = (apiPerson.source || []).map(s => mapApiSourceToSource(s));
+    // The person serializer does not embed sources and the backend `panson`
+    // filter on /sources/ is not applied, so fetch all pages and filter by person.
+    const all: ApiSource[] = [];
+    let page = 1;
+    while (true) {
+      const pageData = await apiFetch<PaginatedResponse<ApiSource>>(`/sources/?page=${page}&page_size=500`);
+      all.push(...pageData.results);
+      if (pageData.next === null || all.length >= pageData.count) break;
+      page += 1;
+    }
+    const sources = all.filter(s => s.panson === personId).map(s => mapApiSourceToSource(s));
     return { success: true, data: sources };
   } catch (err) {
     return { success: false, error: (err as Error).message };
@@ -682,9 +697,30 @@ export async function createSource(data: SourceFormData): Promise<ApiResponse<So
 
 export async function updateSource(id: number, data: Partial<SourceFormData>): Promise<ApiResponse<Source>> {
   try {
+    let body: FormData | string;
+
+    if (data.file instanceof File) {
+      const formData = new FormData();
+      formData.append('panson', (data.panson ?? '').toString());
+      formData.append('name', data.name ?? '');
+      formData.append('capt_number', data.capt_number ?? '');
+      formData.append('shelf_number', data.shelf_number ?? '');
+      formData.append('volume_number', data.volume_number ?? '');
+      formData.append('manuscript_number', data.manuscript_number ?? '');
+      formData.append('page_number', data.page_number ?? '');
+      formData.append('is_primary', (data.is_primary ?? false).toString());
+      formData.append('description', data.description ?? '');
+      formData.append('file', data.file);
+      body = formData as unknown as string;
+    } else {
+      const jsonData: Record<string, unknown> = { ...data };
+      delete jsonData.file;
+      body = JSON.stringify(jsonData);
+    }
+
     const apiSource = await apiFetch<{ id: number; panson: number; name: string; capt_number: string; shelf_number: string; volume_number: string; manuscript_number: string; page_number: string; file: string | null; is_primary: boolean; description: string; created_at: string; updated_at: string }>(`/sources/${id}/`, {
       method: 'PATCH',
-      body: JSON.stringify(data),
+      body,
     });
     
     invalidateCache();
@@ -884,6 +920,59 @@ export async function createRequser(data: RequestFormData): Promise<ApiResponse<
   }
 }
 
+export async function updateRequser(id: number, data: RequestFormData): Promise<ApiResponse<Requser>> {
+  try {
+    let apiRequser: ApiRequser;
+
+    if (data.image_document instanceof File || data.signature instanceof File) {
+      const formData = new FormData();
+      formData.append('type_requser', data.type_requser.toString());
+      formData.append('full_name', data.full_name);
+      formData.append('name_fiamy', data.name_fiamy);
+      formData.append('name_thigh', data.name_thigh);
+      formData.append('home', data.home);
+      formData.append('type_document', data.type_document.toString());
+      formData.append('number_document', data.number_document);
+      formData.append('language', data.language);
+      if (data.name_place) formData.append('name_place', data.name_place);
+      if (data.place !== null) formData.append('place', data.place.toString());
+      if (data.phone) formData.append('phone', data.phone);
+      if (data.phone_whatapp) formData.append('phone_whatapp', data.phone_whatapp);
+      if (data.signature instanceof File) formData.append('signature', data.signature);
+      if (data.image_document instanceof File) formData.append('image_document', data.image_document);
+
+      apiRequser = await apiFetch<ApiRequser>(`/request/requser/${id}/`, {
+        method: 'PATCH',
+        body: formData as unknown as string,
+      });
+    } else {
+      const jsonData: Record<string, unknown> = {
+        type_requser: data.type_requser,
+        full_name: data.full_name,
+        name_fiamy: data.name_fiamy,
+        name_thigh: data.name_thigh,
+        home: data.home,
+        type_document: data.type_document,
+        number_document: data.number_document,
+        language: data.language,
+      };
+      if (data.name_place) jsonData.name_place = data.name_place;
+      if (data.place !== null) jsonData.place = data.place;
+      if (data.phone) jsonData.phone = data.phone;
+      if (data.phone_whatapp) jsonData.phone_whatapp = data.phone_whatapp;
+
+      apiRequser = await apiFetch<ApiRequser>(`/request/requser/${id}/`, {
+        method: 'PATCH',
+        body: JSON.stringify(jsonData),
+      });
+    }
+
+    return { success: true, data: mapApiRequserToRequser(apiRequser) };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
 export async function getStatusesByRequser(requserId: number): Promise<ApiResponse<StatusRequserDcm[]>> {
   try {
     const rawResponse = await apiFetch(`/request/status_requset/?requser=${requserId}`) as Record<string, unknown> | ApiStatusRequserDcm[];
@@ -958,6 +1047,48 @@ export async function createStatusRequser(data: {
       body: formData as unknown as string,
     });
     return { success: true, data: mapApiStatusRequserDcmToStatus(apiStatus) };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export async function updateStatusRequser(
+  id: number,
+  data: { status_requset: StatusRequset; note?: string; file?: File | null }
+): Promise<ApiResponse<StatusRequserDcm>> {
+  try {
+    let apiStatus: ApiStatusRequserDcm;
+
+    if (data.file instanceof File) {
+      const formData = new FormData();
+      formData.append('status_requset', data.status_requset.toString());
+      if (data.note !== undefined) formData.append('note', data.note);
+      formData.append('file', data.file);
+
+      apiStatus = await apiFetch<ApiStatusRequserDcm>(`/request/status_requset/${id}/`, {
+        method: 'PATCH',
+        body: formData as unknown as string,
+      });
+    } else {
+      const jsonData: Record<string, unknown> = { status_requset: data.status_requset };
+      if (data.note !== undefined) jsonData.note = data.note;
+
+      apiStatus = await apiFetch<ApiStatusRequserDcm>(`/request/status_requset/${id}/`, {
+        method: 'PATCH',
+        body: JSON.stringify(jsonData),
+      });
+    }
+
+    return { success: true, data: mapApiStatusRequserDcmToStatus(apiStatus) };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export async function deleteStatusRequser(id: number): Promise<ApiResponse<null>> {
+  try {
+    await apiFetch<null>(`/request/status_requset/${id}/`, { method: 'DELETE' });
+    return { success: true, data: null };
   } catch (err) {
     return { success: false, error: (err as Error).message };
   }
@@ -1196,3 +1327,512 @@ export async function getAllFormRequsersPage(
     return { success: false, error: (err as Error).message };
   }
 }
+
+// ===== Reference API (المعرّفين المناطق) =====
+
+export async function getReferencesPage(
+  page: number,
+  pageSize: number,
+  filters: { search?: string } = {}
+): Promise<ApiResponse<PaginatedResponse<Reference>>> {
+  try {
+    const params = new URLSearchParams({ page: page.toString(), page_size: pageSize.toString() });
+    if (filters.search?.trim()) params.set('search', filters.search.trim());
+
+    const rawResponse = (await apiFetch(`/references/reference/?${params.toString()}`)) as Record<string, unknown> | ApiReference[];
+
+    let responseData: unknown = rawResponse;
+    if (rawResponse && typeof rawResponse === 'object' && !Array.isArray(rawResponse)) {
+      if ('success' in rawResponse && 'data' in rawResponse) {
+        responseData = rawResponse.data;
+      }
+    }
+
+    let results: ApiReference[];
+    let count: number;
+    let next: string | number | null = null;
+    let previous: string | number | null = null;
+
+    if (Array.isArray(responseData)) {
+      results = responseData;
+      count = responseData.length;
+    } else {
+      const paged = responseData as PaginatedResponse<ApiReference>;
+      results = paged.results || [];
+      count = paged.count || 0;
+      next = paged.next;
+      previous = paged.previous;
+    }
+
+    return {
+      success: true,
+      data: {
+        count,
+        next,
+        previous,
+        results: results.map(mapApiReferenceToReference),
+      },
+    };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export async function getReference(id: number): Promise<ApiResponse<Reference>> {
+  try {
+    const apiReference = await apiFetch<ApiReference>(`/references/reference/${id}/`);
+    return { success: true, data: mapApiReferenceToReference(apiReference) };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export async function createReference(data: ReferenceFormData): Promise<ApiResponse<Reference>> {
+  try {
+    const jsonData: Record<string, unknown> = { name: data.name };
+    if (data.city) jsonData.city = data.city;
+    if (data.family) jsonData.family = data.family;
+    if (data.name_place) jsonData.name_place = data.name_place;
+    if (data.information) jsonData.information = data.information;
+    if (data.phone) jsonData.phone = data.phone;
+    if (data.phone_whatapp) jsonData.phone_whatapp = data.phone_whatapp;
+
+    const apiReference = await apiFetch<ApiReference>('/references/reference/', {
+      method: 'POST',
+      body: JSON.stringify(jsonData),
+    });
+    return { success: true, data: mapApiReferenceToReference(apiReference) };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export async function updateReference(id: number, data: ReferenceFormData): Promise<ApiResponse<Reference>> {
+  try {
+    const jsonData: Record<string, unknown> = { name: data.name };
+    if (data.city) jsonData.city = data.city;
+    if (data.family) jsonData.family = data.family;
+    if (data.name_place) jsonData.name_place = data.name_place;
+    if (data.information) jsonData.information = data.information;
+    if (data.phone) jsonData.phone = data.phone;
+    if (data.phone_whatapp) jsonData.phone_whatapp = data.phone_whatapp;
+
+    const apiReference = await apiFetch<ApiReference>(`/references/reference/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(jsonData),
+    });
+    return { success: true, data: mapApiReferenceToReference(apiReference) };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export async function deleteReference(id: number): Promise<ApiResponse<null>> {
+  try {
+    await apiFetch<null>(`/references/reference/${id}/`, { method: 'DELETE' });
+    return { success: true, data: null };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export async function getStatusRequser(id: number): Promise<ApiResponse<StatusRequserDcm>> {
+  try {
+    const apiStatus = await apiFetch<ApiStatusRequserDcm>(`/request/status_requset/${id}/`);
+    return { success: true, data: mapApiStatusRequserDcmToStatus(apiStatus) };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export async function getReferenceRequsersPage(
+  page: number,
+  pageSize: number,
+  filters: { search?: string; reference?: number } = {}
+): Promise<ApiResponse<PaginatedResponse<ReferenceRequser & { reference_name?: string; requser_name?: string; status_label?: string }>>> {
+  try {
+    const params = new URLSearchParams({ page: page.toString(), page_size: pageSize.toString() });
+    if (filters.search?.trim()) params.set('search', filters.search.trim());
+    if (filters.reference) params.set('reference', filters.reference.toString());
+
+    const rawResponse = (await apiFetch(`/references/reference_requser/?${params.toString()}`)) as Record<string, unknown> | ApiReferenceRequser[];
+
+    let responseData: unknown = rawResponse;
+    if (rawResponse && typeof rawResponse === 'object' && !Array.isArray(rawResponse)) {
+      if ('success' in rawResponse && 'data' in rawResponse) {
+        responseData = rawResponse.data;
+      }
+    }
+
+    let results: ApiReferenceRequser[];
+    let count: number;
+    let next: string | number | null = null;
+    let previous: string | number | null = null;
+
+    if (Array.isArray(responseData)) {
+      results = responseData;
+      count = responseData.length;
+    } else {
+      const paged = responseData as PaginatedResponse<ApiReferenceRequser>;
+      results = paged.results || [];
+      count = paged.count || 0;
+      next = paged.next;
+      previous = paged.previous;
+    }
+
+    const mappedResults = results.map(mapApiReferenceRequserToReferenceRequser);
+
+    const referenceCache = new Map<number, string>();
+    const statusCache = new Map<number, { requser_id: number; status_requset: StatusRequset }>();
+    const requserCache = new Map<number, string>();
+
+    for (const r of mappedResults) {
+      if (!referenceCache.has(r.reference_id)) {
+        try {
+          const refRes = await getReference(r.reference_id);
+          referenceCache.set(r.reference_id, refRes.success && refRes.data ? refRes.data.name : `معرف #${r.reference_id}`);
+        } catch {
+          referenceCache.set(r.reference_id, `معرف #${r.reference_id}`);
+        }
+      }
+
+      if (!statusCache.has(r.status_id)) {
+        try {
+          const statusRes = await getStatusRequser(r.status_id);
+          if (statusRes.success && statusRes.data) {
+            statusCache.set(r.status_id, {
+              requser_id: statusRes.data.requser_id,
+              status_requset: statusRes.data.status_requset,
+            });
+            if (!requserCache.has(statusRes.data.requser_id)) {
+              const reqRes = await getRequser(statusRes.data.requser_id);
+              requserCache.set(
+                statusRes.data.requser_id,
+                reqRes.success && reqRes.data ? reqRes.data.full_name : `طلب #${statusRes.data.requser_id}`
+              );
+            }
+          }
+        } catch {
+          statusCache.set(r.status_id, { requser_id: 0, status_requset: StatusRequset.Search });
+        }
+      }
+
+      r.reference_name = referenceCache.get(r.reference_id);
+      const statusInfo = statusCache.get(r.status_id);
+      if (statusInfo && statusInfo.requser_id > 0) {
+        r.status_label = StatusRequsetLabels[statusInfo.status_requset];
+        r.requser_name = requserCache.get(statusInfo.requser_id);
+      }
+    }
+
+    return {
+      success: true,
+      data: { count, next, previous, results: mappedResults },
+    };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export async function getReferenceRequsersByReference(referenceId: number): Promise<ApiResponse<ReferenceRequser[]>> {
+  try {
+    const res = await getReferenceRequsersPage(1, 500, { reference: referenceId });
+    if (res.success && res.data) {
+      return { success: true, data: res.data.results };
+    }
+    return { success: false, error: res.error };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export async function createReferenceRequser(data: {
+  reference: number;
+  status_requser_dcm: number;
+  respones?: string;
+}): Promise<ApiResponse<ReferenceRequser>> {
+  try {
+    const jsonData: Record<string, unknown> = {
+      reference: data.reference,
+      status_requser_dcm: data.status_requser_dcm,
+    };
+    if (data.respones) jsonData.respones = data.respones;
+
+    const apiResponse = await apiFetch<ApiReferenceRequser>('/references/reference_requser/', {
+      method: 'POST',
+      body: JSON.stringify(jsonData),
+    });
+    return { success: true, data: mapApiReferenceRequserToReferenceRequser(apiResponse) };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export async function deleteReferenceRequser(id: number): Promise<ApiResponse<null>> {
+  try {
+    await apiFetch<null>(`/references/reference_requser/${id}/`, { method: 'DELETE' });
+    return { success: true, data: null };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+// ===== Administration (المستخدمين والصلاحيات وسجل الحركة) =====
+
+async function fetchAllPages<T>(endpoint: string): Promise<T[]> {
+  const all: T[] = [];
+  let page = 1;
+  while (true) {
+    const pageData = await apiFetch<PaginatedResponse<T>>(`${endpoint}?page=${page}&page_size=500`);
+    all.push(...pageData.results);
+    if (pageData.next === null || all.length >= pageData.count) break;
+    page += 1;
+  }
+  return all;
+}
+
+export async function getAllAdminUsers(): Promise<ApiResponse<AdminUser[]>> {
+  try {
+    const all = await fetchAllPages<ApiAdminUser>('/users/users');
+    return { success: true, data: all.map(mapApiAdminUserToAdminUser) };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export async function createAdminUser(data: UserFormData): Promise<ApiResponse<AdminUser>> {
+  try {
+    const jsonData: Record<string, unknown> = {
+      username: data.username,
+      password: data.password || '',
+      first_name: data.first_name,
+      last_name: data.last_name,
+      email: data.email,
+      is_active: data.is_active,
+      is_staff: data.is_staff,
+      is_superuser: data.is_superuser,
+      groups: data.groups,
+    };
+
+    const apiUser = await apiFetch<ApiAdminUser>('/users/users/', {
+      method: 'POST',
+      body: JSON.stringify(jsonData),
+    });
+    invalidateCache();
+    return { success: true, data: mapApiAdminUserToAdminUser(apiUser) };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export async function updateAdminUser(id: number, data: UserFormData): Promise<ApiResponse<AdminUser>> {
+  try {
+    const jsonData: Record<string, unknown> = {
+      username: data.username,
+      first_name: data.first_name,
+      last_name: data.last_name,
+      email: data.email,
+      is_active: data.is_active,
+      is_staff: data.is_staff,
+      is_superuser: data.is_superuser,
+      groups: data.groups,
+    };
+    if (data.password && data.password.trim()) jsonData.password = data.password;
+
+    const apiUser = await apiFetch<ApiAdminUser>(`/users/users/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(jsonData),
+    });
+    invalidateCache();
+    return { success: true, data: mapApiAdminUserToAdminUser(apiUser) };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export async function deleteAdminUser(id: number): Promise<ApiResponse<null>> {
+  try {
+    await apiFetch<null>(`/users/users/${id}/`, { method: 'DELETE' });
+    invalidateCache();
+    return { success: true, data: null };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export async function getAllAdminGroups(): Promise<ApiResponse<Group[]>> {
+  try {
+    const all = await fetchAllPages<ApiGroup>('/users/groups');
+    return { success: true, data: all.map(mapApiGroupToGroup) };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export async function createAdminGroup(data: GroupFormData): Promise<ApiResponse<Group>> {
+  try {
+    const jsonData: Record<string, unknown> = {
+      name: data.name,
+      permissions: data.permissions,
+    };
+    const apiGroup = await apiFetch<ApiGroup>('/users/groups/', {
+      method: 'POST',
+      body: JSON.stringify(jsonData),
+    });
+    invalidateCache();
+    return { success: true, data: mapApiGroupToGroup(apiGroup) };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export async function updateAdminGroup(id: number, data: GroupFormData): Promise<ApiResponse<Group>> {
+  try {
+    const jsonData: Record<string, unknown> = {
+      name: data.name,
+      permissions: data.permissions,
+    };
+    const apiGroup = await apiFetch<ApiGroup>(`/users/groups/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(jsonData),
+    });
+    invalidateCache();
+    return { success: true, data: mapApiGroupToGroup(apiGroup) };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export async function deleteAdminGroup(id: number): Promise<ApiResponse<null>> {
+  try {
+    await apiFetch<null>(`/users/groups/${id}/`, { method: 'DELETE' });
+    invalidateCache();
+    return { success: true, data: null };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export async function getAllPermissions(): Promise<ApiResponse<Permission[]>> {
+  try {
+    const all = await fetchAllPages<ApiPermission>('/users/permissions');
+    return { success: true, data: all.map(mapApiPermissionToPermission) };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export async function createPermission(data: PermissionFormData): Promise<ApiResponse<Permission>> {
+  try {
+    const jsonData: Record<string, unknown> = {
+      name: data.name,
+      codename: data.codename,
+      content_type: data.content_type,
+    };
+    const apiPerm = await apiFetch<ApiPermission>('/users/permissions/', {
+      method: 'POST',
+      body: JSON.stringify(jsonData),
+    });
+    invalidateCache();
+    return { success: true, data: mapApiPermissionToPermission(apiPerm) };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export async function updatePermission(id: number, data: PermissionFormData): Promise<ApiResponse<Permission>> {
+  try {
+    const jsonData: Record<string, unknown> = {
+      name: data.name,
+      codename: data.codename,
+      content_type: data.content_type,
+    };
+    const apiPerm = await apiFetch<ApiPermission>(`/users/permissions/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(jsonData),
+    });
+    invalidateCache();
+    return { success: true, data: mapApiPermissionToPermission(apiPerm) };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export async function deletePermission(id: number): Promise<ApiResponse<null>> {
+  try {
+    await apiFetch<null>(`/users/permissions/${id}/`, { method: 'DELETE' });
+    invalidateCache();
+    return { success: true, data: null };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export async function getAllLogEntries(): Promise<ApiResponse<LogEntry[]>> {
+  try {
+    const all = await fetchAllPages<ApiLogEntry>('/users/log-entries');
+    const mapped = all.map(mapApiLogEntryToLogEntry);
+
+    const usersRes = await getAllAdminUsers();
+    if (usersRes.success && usersRes.data) {
+      const userMap = new Map(usersRes.data.map((u) => [u.id, u.username]));
+      mapped.forEach((l) => {
+        l.username = userMap.get(l.user_id) || `المستخدم #${l.user_id}`;
+      });
+    }
+
+    return { success: true, data: mapped };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export async function createLogEntry(data: LogEntryFormData): Promise<ApiResponse<LogEntry>> {
+  try {
+    const jsonData: Record<string, unknown> = {
+      action_flag: data.action_flag,
+      object_id: data.object_id,
+      object_repr: data.object_repr,
+      change_message: data.change_message,
+      user: data.user,
+      content_type: data.content_type,
+    };
+    const apiLog = await apiFetch<ApiLogEntry>('/users/log-entries/', {
+      method: 'POST',
+      body: JSON.stringify(jsonData),
+    });
+    invalidateCache();
+    return { success: true, data: mapApiLogEntryToLogEntry(apiLog) };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export async function updateLogEntry(id: number, data: Partial<LogEntryFormData>): Promise<ApiResponse<LogEntry>> {
+  try {
+    const apiLog = await apiFetch<ApiLogEntry>(`/users/log-entries/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+    invalidateCache();
+    return { success: true, data: mapApiLogEntryToLogEntry(apiLog) };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export async function deleteLogEntry(id: number): Promise<ApiResponse<null>> {
+  try {
+    await apiFetch<null>(`/users/log-entries/${id}/`, { method: 'DELETE' });
+    invalidateCache();
+    return { success: true, data: null };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export const LogActionLabels: Record<LogActionFlag, string> = {
+  1: 'إضافة',
+  2: 'تعديل',
+  3: 'حذف',
+};

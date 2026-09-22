@@ -1,19 +1,22 @@
 'use client';
 
 import { useState } from 'react';
-import { StatusRequset, StatusRequsetLabels } from '@/types';
-import { createStatusRequser } from '@/lib/api';
+import { StatusRequset, StatusRequsetLabels, StatusRequserDcm } from '@/types';
+import { createStatusRequser, updateStatusRequser } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
 import { Save, Upload, Clock } from 'lucide-react';
 
 interface StatusFormProps {
   requserId: number;
+  existing?: StatusRequserDcm | null;
   onSuccess?: () => void;
 }
 
-export default function StatusForm({ requserId, onSuccess }: StatusFormProps) {
-  const [statusRequset, setStatusRequset] = useState<StatusRequset>(StatusRequset.Search);
-  const [note, setNote] = useState('');
+export default function StatusForm({ requserId, existing, onSuccess }: StatusFormProps) {
+  const [statusRequset, setStatusRequset] = useState<StatusRequset>(
+    existing ? existing.status_requset : StatusRequset.Search
+  );
+  const [note, setNote] = useState(existing?.note ?? '');
   const [file, setFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { addToast, triggerRefresh } = useAppStore();
@@ -23,22 +26,30 @@ export default function StatusForm({ requserId, onSuccess }: StatusFormProps) {
 
     setIsSubmitting(true);
     try {
-      const result = await createStatusRequser({
-        requser: requserId,
-        status_requset: statusRequset,
-        note: note || undefined,
-        file: file,
-      });
+      const result = existing
+        ? await updateStatusRequser(existing.id, {
+            status_requset: statusRequset,
+            note: note || undefined,
+            file: file,
+          })
+        : await createStatusRequser({
+            requser: requserId,
+            status_requset: statusRequset,
+            note: note || undefined,
+            file: file,
+          });
 
       if (result.success) {
         addToast({
           type: 'success',
-          message: 'تم إضافة الحالة بنجاح',
+          message: existing ? 'تم حفظ تعديل الحالة بنجاح' : 'تم إضافة الحالة بنجاح',
         });
         triggerRefresh();
-        setNote('');
-        setFile(null);
-        setStatusRequset(StatusRequset.Search);
+        if (!existing) {
+          setNote('');
+          setFile(null);
+          setStatusRequset(StatusRequset.Search);
+        }
         onSuccess?.();
       } else {
         addToast({
@@ -57,7 +68,7 @@ export default function StatusForm({ requserId, onSuccess }: StatusFormProps) {
       <div className="form-section">
         <div className="form-section-title">
           <Clock size={18} />
-          إضافة حالة جديدة
+          {existing ? 'تعديل حالة' : 'إضافة حالة جديدة'}
         </div>
 
         <div className="form-group">
@@ -118,7 +129,7 @@ export default function StatusForm({ requserId, onSuccess }: StatusFormProps) {
           ) : (
             <Save size={16} />
           )}
-          إضافة الحالة
+          {existing ? 'حفظ التعديل' : 'إضافة الحالة'}
         </button>
       </div>
     </form>

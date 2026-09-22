@@ -3,12 +3,13 @@
 import { useState } from 'react';
 import {
   RequestFormData,
+  Requser,
   TypeRequset,
   TypeRequsetLabels,
   TypeDocument,
   TypeDocumentLabels,
 } from '@/types';
-import { createRequser } from '@/lib/api';
+import { createRequser, updateRequser } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
 import CitySelector from './CitySelector';
 import {
@@ -22,6 +23,7 @@ import {
 } from 'lucide-react';
 
 interface RequestFormProps {
+  existing?: Requser | null;
   onSuccess?: (requser: { id: number }) => void;
 }
 
@@ -42,8 +44,28 @@ const defaultFormData: RequestFormData = {
   language: 'لغة العربية',
 };
 
-export default function RequestForm({ onSuccess }: RequestFormProps) {
-  const [form, setForm] = useState<RequestFormData>({ ...defaultFormData });
+export default function RequestForm({ existing, onSuccess }: RequestFormProps) {
+  const [form, setForm] = useState<RequestFormData>(() => {
+    if (existing) {
+      return {
+        type_requser: existing.type_requser,
+        name_place: existing.name_place ?? '',
+        place: existing.place_id,
+        full_name: existing.full_name,
+        name_fiamy: existing.name_fiamy,
+        name_thigh: existing.name_thigh,
+        home: existing.home,
+        type_document: existing.type_document,
+        signature: null,
+        number_document: existing.number_document,
+        image_document: null,
+        phone: existing.phone ?? '',
+        phone_whatapp: existing.phone_whatapp ?? '',
+        language: existing.language,
+      };
+    }
+    return { ...defaultFormData };
+  });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { addToast, triggerRefresh } = useAppStore();
@@ -88,16 +110,18 @@ export default function RequestForm({ onSuccess }: RequestFormProps) {
 
     setIsSubmitting(true);
     try {
-      const result = await createRequser(form);
+      const result = existing
+        ? await updateRequser(existing.id, form)
+        : await createRequser(form);
 
       if (result.success && result.data) {
         addToast({
           type: 'success',
-          message: 'تم إضافة الطلب بنجاح',
+          message: existing ? 'تم حفظ تعديل الطلب بنجاح' : 'تم إضافة الطلب بنجاح',
         });
         triggerRefresh();
         onSuccess?.(result.data);
-        setForm({ ...defaultFormData });
+        if (!existing) setForm({ ...defaultFormData });
       } else {
         addToast({
           type: 'error',
@@ -364,7 +388,7 @@ export default function RequestForm({ onSuccess }: RequestFormProps) {
           ) : (
             <Save size={18} />
           )}
-          إضافة الطلب
+          {existing ? 'حفظ التعديل' : 'إضافة الطلب'}
         </button>
       </div>
     </form>

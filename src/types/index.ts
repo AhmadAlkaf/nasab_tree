@@ -486,6 +486,8 @@ export interface ApiRequser {
   language: string;
   created_at: string;
   updated_at: string;
+  status_requser_dcm?: ApiStatusRequserDcm[] | null;
+  form_requser?: ApiFormRequser[] | null;
 }
 
 export interface Requser {
@@ -507,6 +509,8 @@ export interface Requser {
   language: string;
   created_at: string;
   updated_at: string;
+  status_requser_dcm?: StatusRequserDcm[] | null;
+  form_requser?: FormRequser[] | null;
 }
 
 export interface RequestFormData {
@@ -610,6 +614,8 @@ export function mapApiRequserToRequser(api: ApiRequser): Requser {
     language: api.language,
     created_at: api.created_at,
     updated_at: api.updated_at,
+    status_requser_dcm: api.status_requser_dcm?.map(mapApiStatusRequserDcmToStatus) ?? [],
+    form_requser: api.form_requser?.map((f) => mapApiFormRequserToFormRequser(f)) ?? [],
   };
 }
 
@@ -645,5 +651,256 @@ export function mapApiFormRequserToFormRequser(api: ApiFormRequser): FormRequser
     note: api.note,
     created_at: api.created_at,
     updated_at: api.updated_at,
+  };
+}
+
+// ===== Reference (المعرّفين المناطق) =====
+
+export interface ApiReferenceRequser {
+  id: number;
+  reference: number;
+  status_requser_dcm: number;
+  respones: string | null;
+  crated_at: string;
+  updated_at: string;
+}
+
+export interface ReferenceRequser {
+  id: number;
+  reference_id: number;
+  reference_name?: string;
+  status_id: number;
+  status_label?: string;
+  requser_name?: string;
+  respones: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ApiReference {
+  id: number;
+  name: string;
+  city: number | null;
+  family: string | null;
+  name_place: string | null;
+  information: string | null;
+  phone: string;
+  phone_whatapp: string;
+  crated_at: string;
+  updated_at: string;
+  name_reference_requser?: ApiReferenceRequser[];
+}
+
+export interface Reference {
+  id: number;
+  name: string;
+  city_id: number | null;
+  family: string | null;
+  name_place: string | null;
+  information: string | null;
+  phone: string;
+  phone_whatapp: string;
+  created_at: string;
+  updated_at: string;
+  responses_count: number;
+}
+
+export interface ReferenceFormData {
+  name: string;
+  city?: number | null;
+  family?: string;
+  name_place?: string;
+  information?: string;
+  phone?: string;
+  phone_whatapp?: string;
+}
+
+export function mapApiReferenceToReference(api: ApiReference): Reference {
+  return {
+    id: api.id,
+    name: api.name,
+    city_id: api.city,
+    family: api.family,
+    name_place: api.name_place,
+    information: api.information,
+    phone: api.phone,
+    phone_whatapp: api.phone_whatapp,
+    created_at: api.crated_at,
+    updated_at: api.updated_at,
+    responses_count: (api.name_reference_requser || []).length,
+  };
+}
+
+export function mapApiReferenceRequserToReferenceRequser(api: ApiReferenceRequser): ReferenceRequser {
+  return {
+    id: api.id,
+    reference_id: api.reference,
+    status_id: api.status_requser_dcm,
+    respones: api.respones,
+    created_at: api.crated_at,
+    updated_at: api.updated_at,
+  };
+}
+
+// ===== Administration (المستخدمين والصلاحيات وسجل الحركة) =====
+
+export interface ApiAdminUser {
+  id: number;
+  password: string;
+  last_login: string | null;
+  is_superuser: boolean;
+  username: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  is_staff: boolean;
+  is_active: boolean;
+  date_joined: string;
+  groups: number[];
+  user_permissions: number[];
+}
+
+export interface AdminUser {
+  id: number;
+  username: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  is_active: boolean;
+  is_staff: boolean;
+  is_superuser: boolean;
+  date_joined: string;
+  last_login: string | null;
+  groups: number[];
+  user_permissions: number[];
+}
+
+export interface UserFormData {
+  username: string;
+  password?: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  is_active: boolean;
+  is_staff: boolean;
+  is_superuser: boolean;
+  groups: number[];
+}
+
+export interface ApiGroup {
+  id: number;
+  name: string;
+  permissions: number[];
+}
+
+export interface Group {
+  id: number;
+  name: string;
+  permissions: number[];
+}
+
+export interface GroupFormData {
+  name: string;
+  permissions: number[];
+}
+
+export interface ApiPermission {
+  id: number;
+  name: string;
+  codename: string;
+  content_type: number;
+}
+
+export interface Permission {
+  id: number;
+  name: string;
+  codename: string;
+  content_type: number;
+}
+
+export interface PermissionFormData {
+  name: string;
+  codename: string;
+  content_type: number;
+}
+
+export type LogActionFlag = 1 | 2 | 3;
+
+export interface ApiLogEntry {
+  id: number;
+  action_time: string;
+  object_id: string;
+  object_repr: string;
+  action_flag: LogActionFlag;
+  change_message: string;
+  user: number;
+  content_type: number;
+}
+
+export interface LogEntry {
+  id: number;
+  action_time: string;
+  object_id: string;
+  object_repr: string;
+  action_flag: LogActionFlag;
+  change_message: string;
+  user_id: number;
+  username?: string;
+  content_type: number;
+}
+
+export interface LogEntryFormData {
+  action_flag: LogActionFlag;
+  object_id: string;
+  object_repr: string;
+  change_message: string;
+  user: number;
+  content_type: number;
+}
+
+export function mapApiAdminUserToAdminUser(api: ApiAdminUser): AdminUser {
+  return {
+    id: api.id,
+    username: api.username,
+    first_name: api.first_name,
+    last_name: api.last_name,
+    email: api.email,
+    is_active: api.is_active,
+    is_staff: api.is_staff,
+    is_superuser: api.is_superuser,
+    date_joined: api.date_joined,
+    last_login: api.last_login,
+    groups: api.groups || [],
+    user_permissions: api.user_permissions || [],
+  };
+}
+
+export function mapApiGroupToGroup(api: ApiGroup): Group {
+  return {
+    id: api.id,
+    name: api.name,
+    permissions: api.permissions || [],
+  };
+}
+
+export function mapApiPermissionToPermission(api: ApiPermission): Permission {
+  return {
+    id: api.id,
+    name: api.name,
+    codename: api.codename,
+    content_type: api.content_type,
+  };
+}
+
+export function mapApiLogEntryToLogEntry(api: ApiLogEntry): LogEntry {
+  return {
+    id: api.id,
+    action_time: api.action_time,
+    object_id: api.object_id,
+    object_repr: api.object_repr,
+    action_flag: api.action_flag,
+    change_message: api.change_message,
+    user_id: api.user,
+    content_type: api.content_type,
   };
 }

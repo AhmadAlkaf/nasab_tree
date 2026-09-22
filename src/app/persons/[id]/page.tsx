@@ -3,7 +3,7 @@
 import { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { Person, Wife, Source, GenderLabels, TypePersonLabels, TypeMotherLabels } from '@/types';
-import { getPerson, deletePerson } from '@/lib/api';
+import { getPerson, deletePerson, deleteWife, deleteSource, getSourcesByPerson } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
 import MiniTree from '@/components/tree/MiniTree';
 import Modal from '@/components/ui/Modal';
@@ -28,6 +28,8 @@ export default function PersonDetailsPage({ params }: { params: Promise<{ id: st
   const [isWifeModalOpen, setIsWifeModalOpen] = useState(false);
   const [isSourceModalOpen, setIsSourceModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [editingWife, setEditingWife] = useState<Wife | null>(null);
+  const [editingSource, setEditingSource] = useState<Source | null>(null);
   
   const { refreshKey, addToast } = useAppStore();
   const router = useRouter();
@@ -40,7 +42,11 @@ export default function PersonDetailsPage({ params }: { params: Promise<{ id: st
       if (personRes.success && personRes.data) {
         setPerson(personRes.data);
         setWives(personRes.data.wives || []);
-        setSources(personRes.data.sources || []);
+
+        const sourcesRes = await getSourcesByPerson(personId);
+        if (sourcesRes.success && sourcesRes.data) {
+          setSources(sourcesRes.data);
+        }
       } else {
         addToast({ type: 'error', message: 'لم يتم العثور على الشخص' });
         router.push('/persons');
@@ -60,6 +66,30 @@ export default function PersonDetailsPage({ params }: { params: Promise<{ id: st
     } else {
       addToast({ type: 'error', message: res.error || 'حدث خطأ أثناء الحذف' });
       setIsDeleteModalOpen(false);
+    }
+  };
+
+  const handleDeleteWife = async (wife: Wife) => {
+    const confirmed = window.confirm(`هل تريد حذف الزوجة "${wife.name}"؟`);
+    if (!confirmed) return;
+    const res = await deleteWife(wife.id);
+    if (res.success) {
+      addToast({ type: 'success', message: 'تم حذف الزوجة بنجاح' });
+      setWives(prev => prev.filter(w => w.id !== wife.id));
+    } else {
+      addToast({ type: 'error', message: res.error || 'حدث خطأ أثناء الحذف' });
+    }
+  };
+
+  const handleDeleteSource = async (source: Source) => {
+    const confirmed = window.confirm(`هل تريد حذف المصدر "${source.name}"؟`);
+    if (!confirmed) return;
+    const res = await deleteSource(source.id);
+    if (res.success) {
+      addToast({ type: 'success', message: 'تم حذف المصدر بنجاح' });
+      setSources(prev => prev.filter(s => s.id !== source.id));
+    } else {
+      addToast({ type: 'error', message: res.error || 'حدث خطأ أثناء الحذف' });
     }
   };
 
@@ -241,10 +271,34 @@ export default function PersonDetailsPage({ params }: { params: Promise<{ id: st
                           <Heart size={16} />
                         </div>
                         <div className="list-item-content">
-                          <div className="list-item-title">{wife.name}</div>
+                          <div className="list-item-title">
+                            {wife.name || 'زوجة'}
+                            {wife.number !== null && (
+                              <span className="badge muted" style={{ marginInlineStart: 8 }}>#{wife.number}</span>
+                            )}
+                          </div>
                           <div className="list-item-subtitle">
                             {(wife.birth_year || wife.death_year) && `${wife.birth_year || '?'} - ${wife.death_year || '?'}`}
                           </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <button
+                            className="btn btn-ghost btn-icon"
+                            title="تعديل"
+                            onClick={() => {
+                              setEditingWife(wife);
+                              setIsWifeModalOpen(true);
+                            }}
+                          >
+                            <Edit size={15} style={{ color: 'var(--blue-400)' }} />
+                          </button>
+                          <button
+                            className="btn btn-ghost btn-icon"
+                            title="حذف"
+                            onClick={() => handleDeleteWife(wife)}
+                          >
+                            <Trash2 size={15} style={{ color: 'var(--red-400)' }} />
+                          </button>
                         </div>
                       </div>
                     ))}
@@ -287,6 +341,25 @@ export default function PersonDetailsPage({ params }: { params: Promise<{ id: st
                           {source.volume_number && <span>مجلد: {source.volume_number}</span>}
                           {source.page_number && <span>صفحة: {source.page_number}</span>}
                         </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <button
+                          className="btn btn-ghost btn-icon"
+                          title="تعديل"
+                          onClick={() => {
+                            setEditingSource(source);
+                            setIsSourceModalOpen(true);
+                          }}
+                        >
+                          <Edit size={15} style={{ color: 'var(--blue-400)' }} />
+                        </button>
+                        <button
+                          className="btn btn-ghost btn-icon"
+                          title="حذف"
+                          onClick={() => handleDeleteSource(source)}
+                        >
+                          <Trash2 size={15} style={{ color: 'var(--red-400)' }} />
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -388,27 +461,41 @@ export default function PersonDetailsPage({ params }: { params: Promise<{ id: st
 
       <Modal
         isOpen={isWifeModalOpen}
-        onClose={() => setIsWifeModalOpen(false)}
-        title="إضافة زوجة جديدة"
+        onClose={() => {
+          setIsWifeModalOpen(false);
+          setEditingWife(null);
+        }}
+        title={editingWife ? 'تعديل الزوجة' : 'إضافة زوجة جديدة'}
         icon={<Heart size={20} style={{ color: 'var(--pink-400)' }} />}
       >
         <WifeForm 
           personId={person.id} 
           personName={person.name} 
-          onSuccess={() => setIsWifeModalOpen(false)} 
+          existing={editingWife}
+          onSuccess={() => {
+            setIsWifeModalOpen(false);
+            setEditingWife(null);
+          }} 
         />
       </Modal>
 
       <Modal
         isOpen={isSourceModalOpen}
-        onClose={() => setIsSourceModalOpen(false)}
-        title="إضافة مصدر/وثيقة"
+        onClose={() => {
+          setIsSourceModalOpen(false);
+          setEditingSource(null);
+        }}
+        title={editingSource ? 'تعديل مصدر/وثيقة' : 'إضافة مصدر/وثيقة'}
         icon={<Book size={20} style={{ color: 'var(--blue-400)' }} />}
       >
         <SourceForm 
           personId={person.id} 
           personName={person.name} 
-          onSuccess={() => setIsSourceModalOpen(false)} 
+          existing={editingSource}
+          onSuccess={() => {
+            setIsSourceModalOpen(false);
+            setEditingSource(null);
+          }} 
         />
       </Modal>
 

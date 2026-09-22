@@ -1,33 +1,36 @@
 'use client';
 
 import { useState } from 'react';
-import { SourceFormData } from '@/types';
-import { createSource } from '@/lib/api';
+import { Source, SourceFormData } from '@/types';
+import { createSource, updateSource } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
 import { Save, Book, Upload, Tag } from 'lucide-react';
 
 interface SourceFormProps {
   personId: number;
   personName: string;
+  existing?: Source | null;
   onSuccess?: () => void;
 }
 
-export default function SourceForm({ personId, personName, onSuccess }: SourceFormProps) {
-  const [form, setForm] = useState<SourceFormData>({
-    panson: personId,
-    name: '',
-    capt_number: '',
-    shelf_number: '',
-    volume_number: '',
-    manuscript_number: '',
-    page_number: '',
+export default function SourceForm({ personId, personName, existing, onSuccess }: SourceFormProps) {
+  const [form, setForm] = useState<SourceFormData>(() => ({
+    panson: existing?.person_id ?? personId,
+    name: existing?.name ?? '',
+    capt_number: existing?.capt_number ?? '',
+    shelf_number: existing?.shelf_number ?? '',
+    volume_number: existing?.volume_number ?? '',
+    manuscript_number: existing?.manuscript_number ?? '',
+    page_number: existing?.page_number ?? '',
     file: null,
-    is_primary: false,
-    description: '',
-  });
+    is_primary: existing?.is_primary ?? false,
+    description: existing?.description ?? '',
+  }));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { addToast, triggerRefresh } = useAppStore();
+
+  const isEdit = Boolean(existing);
 
   const updateField = <K extends keyof SourceFormData>(key: K, value: SourceFormData[K]) => {
     setForm(prev => ({ ...prev, [key]: value }));
@@ -47,24 +50,14 @@ export default function SourceForm({ personId, personName, onSuccess }: SourceFo
     }
 
     setIsSubmitting(true);
-    const result = await createSource(form);
+    const result = existing
+      ? await updateSource(existing.id, form)
+      : await createSource(form);
     
     if (result.success) {
-      addToast({ type: 'success', message: 'تم إضافة المصدر بنجاح' });
+      addToast({ type: 'success', message: isEdit ? 'تم تحديث المصدر بنجاح' : 'تم إضافة المصدر بنجاح' });
       triggerRefresh();
       onSuccess?.();
-      setForm({
-        panson: personId,
-        name: '',
-        capt_number: '',
-        shelf_number: '',
-        volume_number: '',
-        manuscript_number: '',
-        page_number: '',
-        file: null,
-        is_primary: false,
-        description: '',
-      });
     } else {
       addToast({ type: 'error', message: result.error || 'حدث خطأ' });
     }
@@ -83,7 +76,7 @@ export default function SourceForm({ personId, personName, onSuccess }: SourceFo
         color: 'var(--blue-400)',
       }}>
         <Book size={14} style={{ display: 'inline', verticalAlign: 'middle', marginLeft: 6 }} />
-        إضافة مصدر لـ: <strong>{personName}</strong>
+        {isEdit ? 'تعديل مصدر لـ:' : 'إضافة مصدر لـ:'} <strong>{personName}</strong>
       </div>
 
       <div className="form-group">
@@ -200,7 +193,7 @@ export default function SourceForm({ personId, personName, onSuccess }: SourceFo
       <div style={{ paddingTop: 8 }}>
         <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
           {isSubmitting ? <span className="loading-spinner" /> : <Save size={16} />}
-          إضافة المصدر
+          {isEdit ? 'حفظ التعديل' : 'إضافة المصدر'}
         </button>
       </div>
     </form>
