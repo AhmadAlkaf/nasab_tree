@@ -1,7 +1,56 @@
 import { create } from 'zustand';
-import { Person } from '@/types';
+import { Person, StoredAuth } from '@/types';
 
-interface AppState {
+export const AUTH_STORAGE_KEY = 'nasab_auth';
+
+export function readStoredAuth(): StoredAuth | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(AUTH_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as StoredAuth;
+    if (!parsed || typeof parsed.token !== 'string' || !parsed.token) return null;
+    return {
+      token: parsed.token,
+      username: parsed.username || '',
+      isStaff: Boolean(parsed.isStaff),
+      permissions: Array.isArray(parsed.permissions) ? parsed.permissions : [],
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function writeStoredAuth(auth: StoredAuth): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(auth));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+export function removeStoredAuth(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.removeItem(AUTH_STORAGE_KEY);
+  } catch {
+    // ignore storage errors
+  }
+}
+
+interface AuthState {
+  token: string | null;
+  username: string | null;
+  isStaff: boolean;
+  permissions: string[];
+  isAuthReady: boolean;
+  setAuth: (auth: StoredAuth) => void;
+  clearAuth: () => void;
+  setAuthReady: (ready: boolean) => void;
+}
+
+interface AppState extends AuthState {
   // Selected person
   selectedPersonId: number | null;
   setSelectedPersonId: (id: number | null) => void;
@@ -48,6 +97,33 @@ export interface Toast {
 }
 
 export const useAppStore = create<AppState>((set) => ({
+  // Auth
+  token: null,
+  username: null,
+  isStaff: false,
+  permissions: [],
+  isAuthReady: false,
+  setAuth: (auth) => {
+    writeStoredAuth(auth);
+    set({
+      token: auth.token,
+      username: auth.username,
+      isStaff: auth.isStaff,
+      permissions: auth.permissions,
+      isAuthReady: true,
+    });
+  },
+  clearAuth: () => {
+    removeStoredAuth();
+    set({
+      token: null,
+      username: null,
+      isStaff: false,
+      permissions: [],
+    });
+  },
+  setAuthReady: (ready) => set({ isAuthReady: ready }),
+
   // Selected person
   selectedPersonId: null,
   setSelectedPersonId: (id) => set({ selectedPersonId: id }),

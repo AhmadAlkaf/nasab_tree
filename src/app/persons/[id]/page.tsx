@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Person, Wife, Source, GenderLabels, TypePersonLabels, TypeMotherLabels } from '@/types';
 import { getPerson, deletePerson, deleteWife, deleteSource, getSourcesByPerson } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
+import { usePageAccess, useCan, PERM } from '@/lib/auth';
 import MiniTree from '@/components/tree/MiniTree';
 import Modal from '@/components/ui/Modal';
 import PersonForm from '@/components/forms/PersonForm';
@@ -33,6 +34,8 @@ export default function PersonDetailsPage({ params }: { params: Promise<{ id: st
   
   const { refreshKey, addToast } = useAppStore();
   const router = useRouter();
+  const allowed = usePageAccess(PERM.person.view);
+  const can = useCan();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -102,6 +105,8 @@ export default function PersonDetailsPage({ params }: { params: Promise<{ id: st
     );
   }
 
+  if (!allowed) return null;
+
   if (!person) return null;
 
   const isMale = person.gender === 'M';
@@ -113,14 +118,18 @@ export default function PersonDetailsPage({ params }: { params: Promise<{ id: st
           <h1 className="page-title">تفاصيل السجل</h1>
         </div>
         <div className="page-header-right">
-          <button className="btn btn-secondary" onClick={() => setIsEditModalOpen(true)}>
-            <Edit size={16} />
-            تعديل البيانات
-          </button>
-          <button className="btn btn-danger" onClick={() => setIsDeleteModalOpen(true)}>
-            <Trash2 size={16} />
-            حذف السجل
-          </button>
+          {can(PERM.person.change) && (
+            <button className="btn btn-secondary" onClick={() => setIsEditModalOpen(true)}>
+              <Edit size={16} />
+              تعديل البيانات
+            </button>
+          )}
+          {can(PERM.person.delete) && (
+            <button className="btn btn-danger" onClick={() => setIsDeleteModalOpen(true)}>
+              <Trash2 size={16} />
+              حذف السجل
+            </button>
+          )}
         </div>
       </div>
 
@@ -221,6 +230,18 @@ export default function PersonDetailsPage({ params }: { params: Promise<{ id: st
                     <div className="info-item-value">{person.death_place.name}</div>
                   </div>
                 )}
+                {(person as any).name_burial_place && (
+                  <div className="info-item">
+                    <div className="info-item-label">مكان الدفن</div>
+                    <div className="info-item-value">{(person as any).name_burial_place}</div>
+                  </div>
+                )}
+                {(person as any).death_case && (
+                  <div className="info-item">
+                    <div className="info-item-label">سبب الوفاة</div>
+                    <div className="info-item-value">{(person as any).death_case}</div>
+                  </div>
+                )}
               </div>
               
               {person.note && (
@@ -254,9 +275,11 @@ export default function PersonDetailsPage({ params }: { params: Promise<{ id: st
                   <Heart size={18} style={{ color: 'var(--pink-400)' }} />
                   الزوجات
                 </div>
-                <button className="btn btn-ghost btn-sm" onClick={() => setIsWifeModalOpen(true)}>
-                  + إضافة زوجة
-                </button>
+                {can(PERM.wife.add) && (
+                  <button className="btn btn-ghost btn-sm" onClick={() => setIsWifeModalOpen(true)}>
+                    + إضافة زوجة
+                  </button>
+                )}
               </div>
               <div className="card-body" style={{ padding: 0 }}>
                 {wives.length === 0 ? (
@@ -282,23 +305,27 @@ export default function PersonDetailsPage({ params }: { params: Promise<{ id: st
                           </div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <button
-                            className="btn btn-ghost btn-icon"
-                            title="تعديل"
-                            onClick={() => {
-                              setEditingWife(wife);
-                              setIsWifeModalOpen(true);
-                            }}
-                          >
-                            <Edit size={15} style={{ color: 'var(--blue-400)' }} />
-                          </button>
-                          <button
-                            className="btn btn-ghost btn-icon"
-                            title="حذف"
-                            onClick={() => handleDeleteWife(wife)}
-                          >
-                            <Trash2 size={15} style={{ color: 'var(--red-400)' }} />
-                          </button>
+                          {can(PERM.wife.change) && (
+                            <button
+                              className="btn btn-ghost btn-icon"
+                              title="تعديل"
+                              onClick={() => {
+                                setEditingWife(wife);
+                                setIsWifeModalOpen(true);
+                              }}
+                            >
+                              <Edit size={15} style={{ color: 'var(--blue-400)' }} />
+                            </button>
+                          )}
+                          {can(PERM.wife.delete) && (
+                            <button
+                              className="btn btn-ghost btn-icon"
+                              title="حذف"
+                              onClick={() => handleDeleteWife(wife)}
+                            >
+                              <Trash2 size={15} style={{ color: 'var(--red-400)' }} />
+                            </button>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -311,13 +338,15 @@ export default function PersonDetailsPage({ params }: { params: Promise<{ id: st
           {/* المصادر */}
           <div className="card">
             <div className="card-header">
-              <div className="card-header-title">
-                <Book size={18} style={{ color: 'var(--blue-400)' }} />
-                المصادر والوثائق
-              </div>
-              <button className="btn btn-ghost btn-sm" onClick={() => setIsSourceModalOpen(true)}>
-                + إضافة مصدر
-              </button>
+                <div className="card-header-title">
+                  <Book size={18} style={{ color: 'var(--blue-400)' }} />
+                  المصادر والوثائق
+                </div>
+                {can(PERM.source.add) && (
+                  <button className="btn btn-ghost btn-sm" onClick={() => setIsSourceModalOpen(true)}>
+                    + إضافة مصدر
+                  </button>
+                )}
             </div>
             <div className="card-body" style={{ padding: 0 }}>
               {sources.length === 0 ? (
@@ -343,23 +372,27 @@ export default function PersonDetailsPage({ params }: { params: Promise<{ id: st
                         </div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <button
-                          className="btn btn-ghost btn-icon"
-                          title="تعديل"
-                          onClick={() => {
-                            setEditingSource(source);
-                            setIsSourceModalOpen(true);
-                          }}
-                        >
-                          <Edit size={15} style={{ color: 'var(--blue-400)' }} />
-                        </button>
-                        <button
-                          className="btn btn-ghost btn-icon"
-                          title="حذف"
-                          onClick={() => handleDeleteSource(source)}
-                        >
-                          <Trash2 size={15} style={{ color: 'var(--red-400)' }} />
-                        </button>
+                        {can(PERM.source.change) && (
+                          <button
+                            className="btn btn-ghost btn-icon"
+                            title="تعديل"
+                            onClick={() => {
+                              setEditingSource(source);
+                              setIsSourceModalOpen(true);
+                            }}
+                          >
+                            <Edit size={15} style={{ color: 'var(--blue-400)' }} />
+                          </button>
+                        )}
+                        {can(PERM.source.delete) && (
+                          <button
+                            className="btn btn-ghost btn-icon"
+                            title="حذف"
+                            onClick={() => handleDeleteSource(source)}
+                          >
+                            <Trash2 size={15} style={{ color: 'var(--red-400)' }} />
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -426,7 +459,7 @@ export default function PersonDetailsPage({ params }: { params: Promise<{ id: st
                         </div>
                       </div>
                       <span className={`badge ${child.gender === 'M' ? 'blue' : 'pink'}`}>
-                        {GenderLabels[child.gender]}
+                        {GenderLabels[child.gender as "M" | "F"]}
                       </span>
                     </div>
                   ))}
@@ -442,6 +475,41 @@ export default function PersonDetailsPage({ params }: { params: Promise<{ id: st
               </button>
             </div>
           </div>
+
+          {/* أبناء من الأم */}
+          {(person as any).children_mother && (person as any).children_mother.length > 0 && (
+            <div className="card">
+              <div className="card-header">
+                <div className="card-header-title">
+                  <User size={18} style={{ color: 'var(--emerald-400)' }} />
+                    الأبناء من الأم ({(person as any).children_mother.length})
+                </div>
+              </div>
+              <div className="card-body" style={{ padding: 0 }}>
+                <div>
+                  {(person as any).children_mother.map((child: any) => (
+                    <div 
+                      key={child.id} 
+                      className="list-item"
+                      onClick={() => router.push(`/persons/${child.id}`)}
+                    >
+                      <div className="list-item-content">
+                        <div
+                          className="list-item-title lineage-name"
+                          title={child.lineage_name || child.name}
+                        >
+                          {truncateLineageName(child.lineage_name || child.name, 8)}
+                        </div>
+                      </div>
+                      <span className={`badge ${child.gender === 'M' ? 'blue' : 'pink'}`}>
+                        {GenderLabels[child.gender as "M" | "F"]}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

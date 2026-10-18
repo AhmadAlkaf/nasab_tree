@@ -4,6 +4,7 @@ import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Person } from '@/types';
 import { getFullPersonTree, getLastLevelPersonTree, getPersonTree } from '@/lib/api';
+import { usePageAccess, useCan, PERM } from '@/lib/auth';
 import FamilyTree from '@/components/tree/FamilyTree';
 import Modal from '@/components/ui/Modal';
 import PersonForm from '@/components/forms/PersonForm';
@@ -20,6 +21,8 @@ function TreeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const rootId = searchParams.get('root') ? parseInt(searchParams.get('root')!, 10) : undefined;
+  const allowed = usePageAccess(PERM.person.view);
+  const can = useCan();
 
   useEffect(() => {
     const fetchTree = async () => {
@@ -76,6 +79,8 @@ function TreeContent() {
     fetchTree();
   };
 
+  if (!allowed) return null;
+
   return (
     <div style={{ height: 'calc(100vh - 48px)', display: 'flex', flexDirection: 'column' }}>
       <div className="page-header" style={{ marginBottom: 16 }}>
@@ -102,7 +107,7 @@ function TreeContent() {
             <span>جاري بناء الشجرة...</span>
           </div>
         ) : persons.length > 0 ? (
-          <FamilyTree persons={persons} rootId={rootId} expandAll={isFullTree} onNodeClick={handleNodeClick} onAddChild={handleAddChild} />
+          <FamilyTree persons={persons} rootId={rootId} expandAll={isFullTree} onNodeClick={handleNodeClick} onAddChild={can(PERM.person.add) ? handleAddChild : undefined} />
         ) : (
           <div className="empty-state" style={{ height: '100%', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-lg)' }}>
             <div className="empty-state-title">لا توجد بيانات</div>

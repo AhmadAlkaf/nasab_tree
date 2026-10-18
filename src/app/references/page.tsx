@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Reference } from '@/types';
 import { getReferencesPage, deleteReference } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
+import { usePageAccess, useCan, PERM } from '@/lib/auth';
 import { useCityNameMap } from '@/hooks/useCityNames';
 import {
   Search, Plus, ChevronLeft, ChevronRight, UserCheck, Phone, MapPin, Trash2, MessagesSquare
@@ -36,6 +37,8 @@ export default function ReferencesPage() {
   const { refreshKey, addToast } = useAppStore();
   const { getCityName } = useCityNameMap();
   const router = useRouter();
+  const allowed = usePageAccess(PERM.reference.view);
+  const can = useCan();
 
   useEffect(() => {
     const fetchReferences = async () => {
@@ -69,6 +72,8 @@ export default function ReferencesPage() {
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const pageNumbers = getVisiblePageNumbers(page, totalPages);
 
+  if (!allowed) return null;
+
   return (
     <div>
       <div className="page-header">
@@ -77,10 +82,12 @@ export default function ReferencesPage() {
           <div className="page-subtitle">قائمة المعرّفين المسجلين في النظام</div>
         </div>
         <div className="page-header-right">
-          <button className="btn btn-primary" onClick={() => router.push('/references/new')}>
-            <Plus size={16} />
-            إضافة معرّف
-          </button>
+          {can(PERM.reference.add) && (
+            <button className="btn btn-primary" onClick={() => router.push('/references/new')}>
+              <Plus size={16} />
+              إضافة معرّف
+            </button>
+          )}
         </div>
       </div>
 
@@ -179,13 +186,15 @@ export default function ReferencesPage() {
                     </td>
                     <td style={{ textAlign: 'left' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <button
-                          className="btn btn-ghost btn-icon"
-                          title="حذف"
-                          onClick={(e) => handleDelete(e, reference)}
-                        >
-                          <Trash2 size={16} style={{ color: 'var(--red-400)' }} />
-                        </button>
+                        {can(PERM.reference.delete) && (
+                          <button
+                            className="btn btn-ghost btn-icon"
+                            title="حذف"
+                            onClick={(e) => handleDelete(e, reference)}
+                          >
+                            <Trash2 size={16} style={{ color: 'var(--red-400)' }} />
+                          </button>
+                        )}
                         <ChevronLeft size={18} style={{ color: 'var(--text-muted)' }} />
                       </div>
                     </td>

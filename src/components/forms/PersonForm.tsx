@@ -53,6 +53,8 @@ const defaultFormData: PersonFormData = {
   name_birth_place: '',
   name_place_place: '',
   name_death_place: '',
+  name_burial_place: '',
+  death_case: 'طبيعة',
   note: '',
   file: null,
 };
@@ -85,6 +87,8 @@ export default function PersonForm({ person, onSuccess, defaultParentId }: Perso
         name_birth_place: person.name_birth_place,
         name_place_place: person.name_place_place,
         name_death_place: person.name_death_place,
+        name_burial_place: person.name_burial_place || '',
+        death_case: person.death_case || 'طبيعة',
         note: person.note,
         file: null,
       });
@@ -416,6 +420,26 @@ export default function PersonForm({ person, onSuccess, defaultParentId }: Perso
               value={form.name_death_place}
               onChange={(e) => updateField('name_death_place', e.target.value)}
               placeholder="اكتب مكان الوفاة إن لم يكن في القائمة"
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label">مكان الدفن</label>
+            <input
+              className="form-input"
+              type="text"
+              value={form.name_burial_place || ''}
+              onChange={(e) => updateField('name_burial_place', e.target.value)}
+              placeholder="مكان الدفن"
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label">سبب الوفاة</label>
+            <input
+              className="form-input"
+              type="text"
+              value={form.death_case || ''}
+              onChange={(e) => updateField('death_case', e.target.value)}
+              placeholder="سبب الوفاة"
             />
           </div>
         </div>

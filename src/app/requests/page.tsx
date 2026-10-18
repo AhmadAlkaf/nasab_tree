@@ -11,6 +11,7 @@ import {
 } from '@/types';
 import { getRequsersPage } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
+import { usePageAccess, useCan, PERM } from '@/lib/auth';
 import {
   Search,
   Plus,
@@ -54,6 +55,8 @@ export default function RequestsPage() {
   const [totalCount, setTotalCount] = useState(0);
   const { refreshKey } = useAppStore();
   const router = useRouter();
+  const allowed = usePageAccess(PERM.requser.view);
+  const can = useCan();
 
   useEffect(() => {
     const fetchRequests = async () => {
@@ -86,6 +89,8 @@ export default function RequestsPage() {
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const pageNumbers = getVisiblePageNumbers(page, totalPages);
 
+  if (!allowed) return null;
+
   return (
     <div>
       <div className="page-header">
@@ -94,10 +99,12 @@ export default function RequestsPage() {
           <div className="page-subtitle">إدارة طلبات تسجيل الأنساب</div>
         </div>
         <div className="page-header-right">
-          <Link href="/requests/new" className="btn btn-primary">
-            <Plus size={18} />
-            إضافة طلب
-          </Link>
+          {can(PERM.requser.add) && (
+            <Link href="/requests/new" className="btn btn-primary">
+              <Plus size={18} />
+              إضافة طلب
+            </Link>
+          )}
         </div>
       </div>
 

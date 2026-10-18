@@ -12,6 +12,7 @@ import {
 } from '@/types';
 import { getRequser, deleteStatusRequser } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
+import { usePageAccess, useCan, PERM } from '@/lib/auth';
 import FormRequserTree from '@/components/tree/FormRequserTree';
 import StatusForm from '@/components/forms/StatusForm';
 import RequestForm from '@/components/forms/RequestForm';
@@ -42,6 +43,8 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
 
   const { refreshKey, addToast, triggerRefresh } = useAppStore();
   const router = useRouter();
+  const allowed = usePageAccess(PERM.requser.view);
+  const can = useCan();
 
   const handleNodeClick = (form: FormRequser) => {
     setEditingForm(form);
@@ -133,10 +136,12 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
           <h1 className="page-title">تفاصيل الطلب</h1>
         </div>
         <div className="page-header-right">
-          <button className="btn btn-secondary" onClick={() => setIsEditRequestModalOpen(true)}>
-            <Pencil size={16} />
-            تعديل الطلب
-          </button>
+          {can(PERM.requser.change) && (
+            <button className="btn btn-secondary" onClick={() => setIsEditRequestModalOpen(true)}>
+              <Pencil size={16} />
+              تعديل الطلب
+            </button>
+          )}
           <button className="btn btn-secondary" onClick={() => router.push('/requests')}>
             <ChevronLeft size={16} />
             العودة للقائمة
@@ -258,9 +263,11 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
                     <button className="btn btn-ghost btn-icon" title="تحميل" onClick={() => handleDownload(requser.image_document, 'الوثيقة')}>
                       <Download size={15} />
                     </button>
-                    <button className="btn btn-ghost btn-icon" title="تعديل" onClick={() => setIsEditRequestModalOpen(true)}>
-                      <Pencil size={15} style={{ color: 'var(--blue-400)' }} />
-                    </button>
+                    {can(PERM.requser.change) && (
+                      <button className="btn btn-ghost btn-icon" title="تعديل" onClick={() => setIsEditRequestModalOpen(true)}>
+                        <Pencil size={15} style={{ color: 'var(--blue-400)' }} />
+                      </button>
+                    )}
                   </>
                 )}
               </div>
@@ -275,9 +282,11 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
                   <button className="btn btn-ghost btn-icon" title="تحميل" onClick={() => handleDownload(requser.signature, 'التوقيع')}>
                     <Download size={15} />
                   </button>
-                  <button className="btn btn-ghost btn-icon" title="تعديل" onClick={() => setIsEditRequestModalOpen(true)}>
-                    <Pencil size={15} style={{ color: 'var(--blue-400)' }} />
-                  </button>
+                  {can(PERM.requser.change) && (
+                    <button className="btn btn-ghost btn-icon" title="تعديل" onClick={() => setIsEditRequestModalOpen(true)}>
+                      <Pencil size={15} style={{ color: 'var(--blue-400)' }} />
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -293,10 +302,12 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
                 <Clock size={18} style={{ color: 'var(--amber-400)' }} />
                 سجل الحالات ({statuses.length})
               </div>
-              <button className="btn btn-ghost btn-sm" onClick={() => setIsStatusModalOpen(true)}>
-                <Plus size={14} />
-                إضافة حالة
-              </button>
+              {can(PERM.status.add) && (
+                <button className="btn btn-ghost btn-sm" onClick={() => setIsStatusModalOpen(true)}>
+                  <Plus size={14} />
+                  إضافة حالة
+                </button>
+              )}
             </div>
             <div className="card-body" style={{ padding: 0 }}>
               {statuses.length === 0 ? (
@@ -324,20 +335,24 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
                               {StatusRequsetLabels[status.status_requset]}
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                              <button
-                                className="btn btn-ghost btn-icon"
-                                title="تعديل"
-                                onClick={() => handleEditStatus(status)}
-                              >
-                                <Pencil size={14} style={{ color: 'var(--blue-400)' }} />
-                              </button>
-                              <button
-                                className="btn btn-ghost btn-icon"
-                                title="حذف"
-                                onClick={() => handleDeleteStatus(status)}
-                              >
-                                <Trash2 size={14} style={{ color: 'var(--red-400)' }} />
-                              </button>
+                              {can(PERM.status.change) && (
+                                <button
+                                  className="btn btn-ghost btn-icon"
+                                  title="تعديل"
+                                  onClick={() => handleEditStatus(status)}
+                                >
+                                  <Pencil size={14} style={{ color: 'var(--blue-400)' }} />
+                                </button>
+                              )}
+                              {can(PERM.status.delete) && (
+                                <button
+                                  className="btn btn-ghost btn-icon"
+                                  title="حذف"
+                                  onClick={() => handleDeleteStatus(status)}
+                                >
+                                  <Trash2 size={14} style={{ color: 'var(--red-400)' }} />
+                                </button>
+                              )}
                             </div>
                           </div>
                           {status.note && (
@@ -373,10 +388,12 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
             <GitBranch size={18} style={{ color: 'var(--emerald-400)' }} />
             شجرة النموذج ({formRequsers.length})
           </div>
-          <button className="btn btn-ghost btn-sm" onClick={() => setIsFormRequserModalOpen(true)}>
-            <Plus size={14} />
-            إضافة شخص
-          </button>
+          {can(PERM.formRequser.add) && (
+            <button className="btn btn-ghost btn-sm" onClick={() => setIsFormRequserModalOpen(true)}>
+              <Plus size={14} />
+              إضافة شخص
+            </button>
+          )}
         </div>
         <div className="card-body" style={{ background: 'var(--bg-secondary)', padding: 0, minHeight: 300 }}>
           {formRequsers.length === 0 ? (
@@ -384,7 +401,7 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
               <div className="empty-state-text" style={{ marginBottom: 0 }}>لا توجد نماذج مسجلة</div>
             </div>
           ) : (
-            <FormRequserTree formRequsers={formRequsers} onNodeClick={(form) => handleNodeClick(form)} onAddChild={(form) => handleAddChild(form)} />
+            <FormRequserTree formRequsers={formRequsers} onNodeClick={(form) => handleNodeClick(form)} onAddChild={can(PERM.formRequser.add) ? (form) => handleAddChild(form) : undefined} />
           )}
         </div>
       </div>

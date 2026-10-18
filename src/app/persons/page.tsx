@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Person, GenderLabels, TypePersonLabels } from '@/types';
 import { getPersonsPage } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
+import { usePageAccess, useCan, PERM } from '@/lib/auth';
 import { Search, UserPlus, ChevronLeft, User, ChevronRight, LoaderCircle } from 'lucide-react';
 import { truncateLineageName } from '@/lib/utils';
 
@@ -33,6 +34,7 @@ function getVisiblePageNumbers(currentPage: number, totalPages: number): Array<n
 export default function PersonsPage() {
   const [persons, setPersons] = useState<Person[]>([]);
   const [query, setQuery] = useState('');
+  const [searchMode, setSearchMode] = useState<'exact' | 'partial'>('exact');
   const [filterGender, setFilterGender] = useState<string>('');
   const [filterType, setFilterType] = useState<string>('');
   const [filterLevel, setFilterLevel] = useState<string>('');
@@ -42,12 +44,15 @@ export default function PersonsPage() {
   const [totalCount, setTotalCount] = useState(0);
   const { refreshKey } = useAppStore();
   const router = useRouter();
+  const allowed = usePageAccess(PERM.person.view);
+  const can = useCan();
 
   useEffect(() => {
     const fetchPersons = async () => {
       setIsLoading(true);
       const res = await getPersonsPage(page, pageSize, {
         search: query,
+        search_mode: searchMode,
         gender: filterGender,
         type: filterType,
         level: filterLevel,
@@ -61,7 +66,7 @@ export default function PersonsPage() {
 
     const delaySearch = setTimeout(fetchPersons, query.trim() ? 300 : 0);
     return () => clearTimeout(delaySearch);
-  }, [refreshKey, page, pageSize, query, filterGender, filterType, filterLevel]);
+  }, [refreshKey, page, pageSize, query, searchMode, filterGender, filterType, filterLevel]);
 
   const changeFilter = (setter: (value: string) => void, value: string) => {
     setter(value);
@@ -76,6 +81,8 @@ export default function PersonsPage() {
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const pageNumbers = getVisiblePageNumbers(page, totalPages);
 
+  if (!allowed) return null;
+
   return (
     <div>
       <div className="page-header">
@@ -84,16 +91,18 @@ export default function PersonsPage() {
           <div className="page-subtitle">إدارة بحث وإثبات النسب</div>
         </div>
         <div className="page-header-right">
-          <Link href="/persons/new" className="btn btn-primary">
-            <UserPlus size={18} />
-            إضافة شخص جديد
-          </Link>
+          {can(PERM.person.add) && (
+            <Link href="/persons/new" className="btn btn-primary">
+              <UserPlus size={18} />
+              إضافة شخص جديد
+            </Link>
+          )}
         </div>
       </div>
 
       <div className="card">
         <div className="card-header">
-          <div className="search-wrapper" style={{ width: '100%', maxWidth: 400 }}>
+          <div className="search-wrapper" style={{ width: '100%', maxWidth: 300 }}>
             <Search className="search-icon" />
             <input
               type="text"
@@ -103,6 +112,15 @@ export default function PersonsPage() {
               onChange={(e) => changeFilter(setQuery, e.target.value)}
             />
           </div>
+          <select
+            className="form-select"
+            value={searchMode}
+            onChange={(e) => { setSearchMode(e.target.value as 'exact' | 'partial'); setPage(1); }}
+            style={{ width: 140 }}
+          >
+            <option value="exact">المطابقة التامة</option>
+            <option value="partial">المطابقة الجزئية</option>
+          </select>
           <div style={{ display: 'flex', gap: '10px' }}>
             <select
               className="form-select"

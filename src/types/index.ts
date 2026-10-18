@@ -37,10 +37,10 @@ export const TypePersonDescriptions: Record<TypePerson, string> = {
   [TypePerson.contract]: 'دخل عقد',
   [TypePerson.included]: 'جامع',
   [TypePerson.punish_included]: 'جامع منقرض',
-  [TypePerson.brotherhood_agreement]: 'كريم',
+  [TypePerson.brotherhood_agreement]: 'ك',
   [TypePerson.smaller_larger]: 'داخل',
-  [TypePerson.included_extinct_females_only]: 'جامع منقرض بنات فقط',
-  [TypePerson.extinct_females_only]: 'منقرض بنات فقط',
+  [TypePerson.included_extinct_females_only]: 'ج ض ب',
+  [TypePerson.extinct_females_only]: 'ض ب',
   [TypePerson.unknown]: 'عادي',
   [TypePerson.not_unknown]: '     ',
 };
@@ -188,6 +188,8 @@ export interface ApiPerson {
   name_birth_place: string | null;
   name_place_place: string | null;
   name_death_place: string | null;
+  name_burial_place?: string | null;
+  death_case?: string | null;
   lineage_name: string | null;
   note: string | null;
   file: string | null;
@@ -202,6 +204,7 @@ export interface ApiPerson {
   death_place: number | null;
   mother: number | null;
   children?: ApiPerson[] | boolean;
+  children_mother?: ApiPerson[] | boolean;
 }
 
 // ===== Internal Person model (enriched) =====
@@ -232,6 +235,8 @@ export interface Person {
   name_birth_place: string;
   name_place_place: string;
   name_death_place: string;
+  name_burial_place?: string;
+  death_case?: string;
   lineage_name: string;
   note: string;
   file: string | null;
@@ -242,6 +247,8 @@ export interface Person {
   rght: number;
   has_children?: boolean;
   children?: Person[];
+  children_mother?: Person[];
+  has_children_mother?: boolean;
   wives?: Wife[];
   sources?: Source[];
 }
@@ -311,6 +318,8 @@ export function mapApiPersonToPerson(api: ApiPerson, allPersons?: ApiPerson[], p
     name_birth_place: api.name_birth_place || '',
     name_place_place: api.name_place_place || '',
     name_death_place: api.name_death_place || '',
+    name_burial_place: api.name_burial_place || '',
+    death_case: api.death_case || 'طبيعة',
     lineage_name: api.lineage_name || '',
     note: api.note || '',
     file: api.file,
@@ -327,6 +336,10 @@ export function mapApiPersonToPerson(api: ApiPerson, allPersons?: ApiPerson[], p
       : Array.isArray(api.children)
         ? api.children.map(child => mapApiPersonToPerson(child, undefined, api.id))
         : undefined,
+    has_children_mother: api.children_mother === true,
+    children_mother: Array.isArray(api.children_mother)
+      ? api.children_mother.map(child => mapApiPersonToPerson(child as any, undefined, null))
+      : undefined,
   };
 }
 
@@ -385,6 +398,8 @@ export interface PersonFormData {
   name_birth_place: string;
   name_place_place: string;
   name_death_place: string;
+  name_burial_place?: string;
+  death_case?: string;
   note: string;
   file: File | null;
 }
@@ -457,6 +472,7 @@ export interface DashboardData {
   count_person_gender_male: number;
   count_person_gender_female: number;
   max_level: number;
+  count_mother: number;
   count_wife: number;
   count_source: number;
 }
@@ -740,6 +756,23 @@ export function mapApiReferenceRequserToReferenceRequser(api: ApiReferenceRequse
     created_at: api.crated_at,
     updated_at: api.updated_at,
   };
+}
+
+// ===== Authentication (تسجيل الدخول) =====
+
+export interface LoginResponse {
+  message: string;
+  token: string;
+  username: string;
+  is_staff: boolean;
+  permissions: string[];
+}
+
+export interface StoredAuth {
+  token: string;
+  username: string;
+  isStaff: boolean;
+  permissions: string[];
 }
 
 // ===== Administration (المستخدمين والصلاحيات وسجل الحركة) =====

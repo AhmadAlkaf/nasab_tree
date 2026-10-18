@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import Sidebar from "@/components/layout/Sidebar";
+import AppShell from "@/components/layout/AppShell";
 import ToastContainer from "@/components/ui/ToastContainer";
 import ThemeProvider from "@/components/providers/ThemeProvider";
 
@@ -36,12 +36,7 @@ export default function RootLayout({
       </head>
       <body>
         <ThemeProvider>
-          <div className="app-layout">
-            <Sidebar />
-            <main className="main-content">
-              {children}
-            </main>
-          </div>
+          <AppShell>{children}</AppShell>
           <ToastContainer />
         </ThemeProvider>
       </body>

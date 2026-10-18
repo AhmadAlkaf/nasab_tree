@@ -26,6 +26,7 @@ export default function ParentSelector({
 }: ParentSelectorProps) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
+  const [searchMode, setSearchMode] = useState<'exact' | 'partial'>('exact');
   const [isOpen, setIsOpen] = useState(false);
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -49,7 +50,7 @@ export default function ParentSelector({
       return;
     }
     setIsLoading(true);
-    const res = await searchPersons(q);
+    const res = await searchPersons(q, searchMode);
     if (res.success && res.data) {
       let filtered = res.data;
       if (genderFilter) {
@@ -61,7 +62,7 @@ export default function ParentSelector({
       setResults(filtered);
     }
     setIsLoading(false);
-  }, [genderFilter, excludeId]);
+  }, [genderFilter, excludeId, searchMode]);
 
   const handleInputChange = (val: string) => {
     setQuery(val);
@@ -149,6 +150,22 @@ export default function ParentSelector({
           
           {isOpen && (query.trim() || isLoading) && (
             <div className="search-dropdown">
+              <div style={{ display: 'flex', gap: 6, padding: '8px 10px', borderBottom: '1px solid var(--border-subtle)' }}>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${searchMode === 'exact' ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSearchMode('exact'); doSearch(query); }}
+                >
+                  المطابقة التامة
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${searchMode === 'partial' ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSearchMode('partial'); doSearch(query); }}
+                >
+                  المطابقة الجزئية
+                </button>
+              </div>
               {isLoading ? (
                 <div style={{ padding: 16, textAlign: 'center' }}>
                   <div className="loading-spinner" />

@@ -15,10 +15,31 @@ import {
   Group, ApiGroup, GroupFormData, mapApiGroupToGroup,
   Permission, ApiPermission, PermissionFormData, mapApiPermissionToPermission,
   LogEntry, ApiLogEntry, LogEntryFormData, LogActionFlag, mapApiLogEntryToLogEntry,
+  LoginResponse,
 } from '@/types';
+import { useAppStore, readStoredAuth } from '@/lib/store';
 
 // ===== Base URL (proxied through Next.js rewrites) =====
 const BASE_URL = '/api';
+
+// ===== Helper: read auth token from store/localStorage =====
+function getAuthToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  const token = useAppStore.getState().token;
+  if (token) return token;
+  const stored = readStoredAuth();
+  return stored ? stored.token : null;
+}
+
+function handleAuthFailure(): void {
+  if (typeof window === 'undefined') return;
+  const hadToken = Boolean(getAuthToken());
+  if (!hadToken) return;
+  useAppStore.getState().clearAuth();
+  if (window.location.pathname !== '/login') {
+    window.location.href = '/login';
+  }
+}
 
 // ===== Helper: API fetch =====
 async function apiFetch<T>(
@@ -33,6 +54,12 @@ async function apiFetch<T>(
   if (!(options.body instanceof FormData)) {
     defaultHeaders['Content-Type'] = 'application/json';
   }
+
+  const isAuthEndpoint = endpoint.startsWith('/users/login') || endpoint.startsWith('/users/logout');
+  const token = getAuthToken();
+  if (token && !endpoint.startsWith('/users/login')) {
+    defaultHeaders['Authorization'] = `Token ${token}`;
+  }
   
   const res = await fetch(url, {
     ...options,
@@ -46,17 +73,29 @@ async function apiFetch<T>(
   if (res.status === 204) {
     return null as T;
   }
+
+  // Session expired / not authenticated → clear session and go to login
+  if (res.status === 401 && !isAuthEndpoint) {
+    handleAuthFailure();
+  }
+  // Do not auto-logout on 403: backend may not be reading Token auth yet
+  // causing 403 for authenticated-looking requests; treat as permission error.
   
   if (!res.ok) {
     let errorMsg = `خطأ في الاتصال: ${res.status}`;
     try {
       const errorData = await res.json();
-      if (typeof errorData === 'object') {
-        // Django REST Framework returns errors as { field: [messages] }
-        const messages = Object.entries(errorData)
-          .map(([key, val]) => `${key}: ${Array.isArray(val) ? val.join(', ') : val}`)
-          .join(' | ');
-        if (messages) errorMsg = messages;
+      if (typeof errorData === 'object' && errorData !== null) {
+        if ('message' in errorData) {
+          const msg = (errorData as { message?: unknown }).message;
+          errorMsg = Array.isArray(msg) ? msg.join(', ') : String(msg);
+        } else {
+          // Django REST Framework returns errors as { field: [messages] }
+          const messages = Object.entries(errorData)
+            .map(([key, val]) => `${key}: ${Array.isArray(val) ? val.join(', ') : val}`)
+            .join(' | ');
+          if (messages) errorMsg = messages;
+        }
       }
     } catch {
       // ignore parse errors
@@ -177,11 +216,14 @@ export async function getPersons(): Promise<ApiResponse<Person[]>> {
 export async function getPersonsPage(
   page: number,
   pageSize: number,
-  filters: { search?: string; gender?: string; type?: string; level?: string } = {}
+  filters: { search?: string; search_mode?: 'exact' | 'partial'; gender?: string; type?: string; level?: string } = {}
 ): Promise<ApiResponse<PaginatedResponse<Person>>> {
   try {
     const params = new URLSearchParams({ page: page.toString(), page_size: pageSize.toString() });
-    if (filters.search?.trim()) params.set('search', filters.search.trim());
+    if (filters.search?.trim()) {
+      params.set('search', filters.search.trim());
+      params.set('search_mode', filters.search_mode || 'exact');
+    }
     if (filters.gender) params.set('gender', filters.gender);
     if (filters.type) params.set('type_person', filters.type);
     if (filters.level) params.set('level', filters.level);
@@ -272,6 +314,8 @@ export async function createPerson(data: PersonFormData): Promise<ApiResponse<Pe
       formData.append('name_birth_place', data.name_birth_place || '');
       formData.append('name_place_place', data.name_place_place || '');
       formData.append('name_death_place', data.name_death_place || '');
+      if ((data as any).name_burial_place !== undefined) formData.append('name_burial_place', (data as any).name_burial_place || '');
+      if ((data as any).death_case !== undefined) formData.append('death_case', (data as any).death_case || '');
       formData.append('note', data.note || '');
       formData.append('file', data.file);
       body = formData as unknown as string; // TypeScript workaround
@@ -290,6 +334,8 @@ export async function createPerson(data: PersonFormData): Promise<ApiResponse<Pe
         name_death_place: data.name_death_place || '',
         note: data.note || '',
       };
+      if ((data as any).name_burial_place !== undefined) jsonData.name_burial_place = (data as any).name_burial_place;
+      if ((data as any).death_case !== undefined) jsonData.death_case = (data as any).death_case;
       if (data.parent !== null) jsonData.parent = data.parent;
       if (data.birth_year !== null) jsonData.birth_year = data.birth_year;
       if (data.death_year !== null) jsonData.death_year = data.death_year;
@@ -366,12 +412,12 @@ export async function deletePerson(id: number): Promise<ApiResponse<null>> {
   }
 }
 
-export async function searchPersons(query: string): Promise<ApiResponse<SearchResult[]>> {
+export async function searchPersons(query: string, mode: 'exact' | 'partial' = 'exact'): Promise<ApiResponse<SearchResult[]>> {
   try {
     const q = query.toLowerCase().trim();
     if (!q) return { success: true, data: [] };
     
-    const pageData = await fetchApiPersonsPage(`/persons/?search=${encodeURIComponent(q)}`);
+    const pageData = await fetchApiPersonsPage(`/persons/?search=${encodeURIComponent(q)}&search_mode=${mode}`);
     const results = pageData.results.slice(0, 15).map(p => ({
       person: mapApiPersonToPerson(p),
       lineage: p.lineage_name || p.name,
@@ -808,6 +854,7 @@ export async function getStats(): Promise<ApiResponse<{
   totalWives: number;
   totalSources: number;
   generations: number;
+  totalMothers: number;
 }>> {
   try {
     const response = await getDashboard();
@@ -824,6 +871,7 @@ export async function getStats(): Promise<ApiResponse<{
         totalWives: dashboard.count_wife,
         totalSources: dashboard.count_source,
         generations: dashboard.max_level,
+        totalMothers: dashboard.count_mother ?? 0,
       },
     };
   } catch (err) {
@@ -1571,6 +1619,29 @@ export async function createReferenceRequser(data: {
 export async function deleteReferenceRequser(id: number): Promise<ApiResponse<null>> {
   try {
     await apiFetch<null>(`/references/reference_requser/${id}/`, { method: 'DELETE' });
+    return { success: true, data: null };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+// ===== Authentication (تسجيل الدخول) =====
+
+export async function login(username: string, password: string): Promise<ApiResponse<LoginResponse>> {
+  try {
+    const data = await apiFetch<LoginResponse>('/users/login/', {
+      method: 'POST',
+      body: JSON.stringify({ username, password }),
+    });
+    return { success: true, data };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export async function logout(): Promise<ApiResponse<null>> {
+  try {
+    await apiFetch<null>('/users/logout/', { method: 'POST' });
     return { success: true, data: null };
   } catch (err) {
     return { success: false, error: (err as Error).message };

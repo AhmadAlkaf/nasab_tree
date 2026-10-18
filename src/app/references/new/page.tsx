@@ -2,14 +2,18 @@
 
 import { useRouter } from 'next/navigation';
 import ReferenceForm from '@/components/forms/ReferenceForm';
+import { usePageAccess, PERM } from '@/lib/auth';
 import { UserCheck } from 'lucide-react';
 
 export default function NewReferencePage() {
   const router = useRouter();
+  const allowed = usePageAccess(PERM.reference.add);
 
   const handleSuccess = () => {
     router.push('/references');
   };
+
+  if (!allowed) return null;
 
   return (
     <div>

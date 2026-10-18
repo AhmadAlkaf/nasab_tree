@@ -9,6 +9,7 @@ import {
   ClipboardList, Plus, ChevronLeft, User, Calendar, MapPin, FileText
 } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
+import { useCan, PERM } from '@/lib/auth';
 import { Requser, TypeRequsetLabels } from '@/types';
 
 export default function Dashboard() {
@@ -19,6 +20,7 @@ export default function Dashboard() {
     totalWives: 0,
     totalSources: 0,
     generations: 0,
+    totalMothers: 0,
   });
   const [recentRequests, setRecentRequests] = useState<Requser[]>([]);
   const [totalRequests, setTotalRequests] = useState(0);
@@ -28,6 +30,7 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const { refreshKey } = useAppStore();
   const router = useRouter();
+  const can = useCan();
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -103,6 +106,12 @@ export default function Dashboard() {
               <div className="stat-icon pink"><Users size={22} /></div>
               <div className="stat-value">{stats.totalFemales}</div>
               <div className="stat-label">الإناث</div>
+            </div>
+
+            <div className="stat-card emerald">
+              <div className="stat-icon emerald"><Heart size={22} /></div>
+              <div className="stat-value">{stats.totalMothers ?? 0}</div>
+              <div className="stat-label">عدد الأمهات</div>
             </div>
 
             <div className="stat-card emerald">
@@ -206,45 +215,53 @@ export default function Dashboard() {
             إجراءات سريعة
           </h2>
           <div className="quick-actions">
-            <Link href="/requests/new" className="quick-action">
-              <div className="quick-action-icon" style={{ background: 'rgba(59,130,246,0.1)', color: 'var(--blue-400)' }}>
-                <Plus size={20} />
-              </div>
-              <div>
-                <div className="quick-action-title">إضافة طلب جديد</div>
-                <div className="quick-action-desc">تسجيل طلب تسجيل نسب جديد</div>
-              </div>
-            </Link>
+            {can(PERM.requser.add) && (
+              <Link href="/requests/new" className="quick-action">
+                <div className="quick-action-icon" style={{ background: 'rgba(59,130,246,0.1)', color: 'var(--blue-400)' }}>
+                  <Plus size={20} />
+                </div>
+                <div>
+                  <div className="quick-action-title">إضافة طلب جديد</div>
+                  <div className="quick-action-desc">تسجيل طلب تسجيل نسب جديد</div>
+                </div>
+              </Link>
+            )}
 
-            <Link href="/persons/new" className="quick-action">
-              <div className="quick-action-icon" style={{ background: 'rgba(212,168,83,0.1)', color: 'var(--gold-400)' }}>
-                <UserPlus size={20} />
-              </div>
-              <div>
-                <div className="quick-action-title">إضافة شخص جديد</div>
-                <div className="quick-action-desc">تسجيل فرد جديد في الشجرة</div>
-              </div>
-            </Link>
+            {can(PERM.person.add) && (
+              <Link href="/persons/new" className="quick-action">
+                <div className="quick-action-icon" style={{ background: 'rgba(212,168,83,0.1)', color: 'var(--gold-400)' }}>
+                  <UserPlus size={20} />
+                </div>
+                <div>
+                  <div className="quick-action-title">إضافة شخص جديد</div>
+                  <div className="quick-action-desc">تسجيل فرد جديد في الشجرة</div>
+                </div>
+              </Link>
+            )}
 
-            <Link href="/tree" className="quick-action">
-              <div className="quick-action-icon" style={{ background: 'rgba(16,185,129,0.1)', color: 'var(--emerald-400)' }}>
-                <GitBranch size={20} />
-              </div>
-              <div>
-                <div className="quick-action-title">عرض الشجرة الكاملة</div>
-                <div className="quick-action-desc">تصفح العلاقات الهرمية بصرياً</div>
-              </div>
-            </Link>
+            {can(PERM.person.view) && (
+              <Link href="/tree" className="quick-action">
+                <div className="quick-action-icon" style={{ background: 'rgba(16,185,129,0.1)', color: 'var(--emerald-400)' }}>
+                  <GitBranch size={20} />
+                </div>
+                <div>
+                  <div className="quick-action-title">شجرة العائلة</div>
+                  <div className="quick-action-desc">استعرض العلاقات الهرمية للعائلة</div>
+                </div>
+              </Link>
+            )}
 
-            <Link href="/persons" className="quick-action">
-              <div className="quick-action-icon" style={{ background: 'rgba(236,72,153,0.1)', color: 'var(--pink-400)' }}>
-                <Search size={20} />
-              </div>
-              <div>
-                <div className="quick-action-title">إدارة الإثبات</div>
-                <div className="quick-action-desc">بحث وإثبات النسب</div>
-              </div>
-            </Link>
+            {can(PERM.person.view) && (
+              <Link href="/persons" className="quick-action">
+                <div className="quick-action-icon" style={{ background: 'rgba(236,72,153,0.1)', color: 'var(--pink-400)' }}>
+                  <Search size={20} />
+                </div>
+                <div>
+                  <div className="quick-action-title">إدارة الإثبات</div>
+                  <div className="quick-action-desc">بحث وإثبات النسب</div>
+                </div>
+              </Link>
+            )}
           </div>
         </>
       )}

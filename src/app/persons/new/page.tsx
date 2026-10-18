@@ -3,6 +3,7 @@
 import { Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import PersonForm from '@/components/forms/PersonForm';
+import { usePageAccess, PERM } from '@/lib/auth';
 import { UserPlus } from 'lucide-react';
 
 function NewPersonContent() {
@@ -36,6 +37,10 @@ function NewPersonContent() {
 }
 
 export default function NewPersonPage() {
+  const allowed = usePageAccess(PERM.person.add);
+
+  if (!allowed) return null;
+
   return (
     <div>
       <div className="page-header" style={{ maxWidth: 800, margin: '0 auto 28px' }}>

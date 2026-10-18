@@ -2,14 +2,18 @@
 
 import { useRouter } from 'next/navigation';
 import RequestForm from '@/components/forms/RequestForm';
+import { usePageAccess, PERM } from '@/lib/auth';
 import { ClipboardList } from 'lucide-react';
 
 export default function NewRequestPage() {
   const router = useRouter();
+  const allowed = usePageAccess(PERM.requser.add);
 
   const handleSuccess = (requser: { id: number }) => {
     router.push(`/requests/${requser.id}`);
   };
+
+  if (!allowed) return null;
 
   return (
     <div>
